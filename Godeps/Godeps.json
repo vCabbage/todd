@@ -1,0 +1,45 @@
+{
+	"ImportPath": "github.com/mierdin/todd",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.3-3-g07d998d",
+			"Rev": "07d998d174c4e2dc90e2f1989a20724220bca1ff"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/client",
+			"Comment": "v2.3.0-alpha.0-5-g7c9e92d",
+			"Rev": "7c9e92d1d589195cda0e590a31880d889772e92a"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
+			"Comment": "v2.3.0-alpha.0-5-g7c9e92d",
+			"Rev": "7c9e92d1d589195cda0e590a31880d889772e92a"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.3.0-alpha.0-5-g7c9e92d",
+			"Rev": "7c9e92d1d589195cda0e590a31880d889772e92a"
+		},
+		{
+			"ImportPath": "github.com/streadway/amqp",
+			"Rev": "6a378341a305bfbc252e8a6638f16cf443221997"
+		},
+		{
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "b1ee7b3fbbb773e8e4b649ade000633fb867ba77"
+		},
+		{
+			"ImportPath": "gopkg.in/gcfg.v1",
+			"Rev": "0ef1a8547f99b94fac9af5377dd72febba18f37c"
+		}
+	]
+}
