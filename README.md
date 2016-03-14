@@ -1,6 +1,6 @@
 ToDD
 ====
-[![Build Status](https://travis-ci.com/Mierdin/todd.svg?token=k3waDSHzjHga6AqNt7hL&branch=master)](https://travis-ci.com/Mierdin/todd)
+[![Build Status](https://travis-ci.org/Mierdin/todd.svg?branch=master)](https://travis-ci.org/Mierdin/todd)
 [![Documentation Status](https://readthedocs.org/projects/todd/badge/?version=latest)](http://todd.readthedocs.org/en/latest/?badge=latest)
 
 ToDD stands for "Testing on Demand: Distributed!". ToDD is an extensible framework for providing natively distributed testing on demand.
