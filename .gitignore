@@ -1,0 +1,12 @@
+*temp*
+assets/
+build/
+.vagrant/
+agent-dev.cfg
+server-dev.cfg
+docs/.Python
+docs/bin/
+docs/include/
+docs/lib/
+preso_secret/
+client/repeattest.sh

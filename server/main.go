@@ -1,35 +1,58 @@
 /*
-   Primary starting point for todd
+    ToDD Server - primary entry point
 
-   Author: Matt Oswalt
+	Copyright 2016 Matt Oswalt. Use or modification of this
+	source code is governed by the license provided here:
+	https://github.com/Mierdin/todd/blob/master/LICENSE
 */
 
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
 	"time"
 
-	log "github.com/mierdin/todd/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	toddapi "github.com/mierdin/todd/api/server"
-	"github.com/mierdin/todd/common"
-	"github.com/mierdin/todd/comms"
-	"github.com/mierdin/todd/config"
-	"github.com/mierdin/todd/db"
-	"github.com/mierdin/todd/facts"
+	toddapi "github.com/Mierdin/todd/api/server"
+	"github.com/Mierdin/todd/comms"
+	"github.com/Mierdin/todd/config"
+	"github.com/Mierdin/todd/db"
+	"github.com/Mierdin/todd/server/grouping"
+	log "github.com/Sirupsen/logrus"
 )
 
+// Command-line Arguments
+var arg_config string
+
 func init() {
+
+	flag.Usage = func() {
+		fmt.Print(`Usage: todd-server [OPTIONS] COMMAND [arg...]
+
+    An extensible framework for providing natively distributed testing on demand
+
+    Options:
+      --config="/etc/todd/server.cfg"          Absolute path to ToDD server config file`, "\n\n")
+
+		os.Exit(0)
+	}
+
+	flag.StringVar(&arg_config, "config", "/etc/todd/server.cfg", "ToDD server config file location")
+	flag.Parse()
+
 	// TODO(moswalt): Implement configurable loglevel in server and agent
 	log.SetLevel(log.DebugLevel)
 }
 
 func main() {
 
-	//TODO (moswalt): Need to make this configurable
-	cfg := config.GetConfig("/etc/server_config.cfg")
+	todd_version := "0.0.1"
 
-	// Start serving collectors, and retrieve map of names and hashes
-	fact_collectors := facts.ServeFactCollectors(cfg)
+	cfg := config.GetConfig(arg_config)
+
+	// Start serving collectors and testlets, and retrieve map of names and hashes
+	assets := serveAssets(cfg)
 
 	// Perform database initialization tasks
 	var tdb = db.NewToddDB(cfg)
@@ -39,11 +62,20 @@ func main() {
 	var tapi toddapi.ToDDApi
 	go tapi.Start(cfg)
 
-	// Start listening for
+	// Start listening for agent advertisements
 	var tc = comms.NewToDDComms(cfg)
-	go tc.CommsPackage.ListenForAgent(fact_collectors)
+	go tc.CommsPackage.ListenForAgent(assets)
 
-	log.Infof("ToDD server %s. Press any key to exit...\n", common.VERSION)
+	// Kick off group calculation in background
+	go func() {
+		for {
+			log.Info("Beginning group calculation")
+			grouping.CalculateGroups(cfg)
+			time.Sleep(time.Second * time.Duration(cfg.Grouping.Interval))
+		}
+	}()
+
+	log.Infof("ToDD server v%s. Press any key to exit...\n", todd_version)
 
 	// Sssh, sssh, only dreams now....
 	for {

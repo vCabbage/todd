@@ -1,48 +1,64 @@
 /*
-   ToDD API
+    ToDD API - manages agents
 
-   Copyright 2015 - Matt Oswalt
+	Copyright 2016 Matt Oswalt. Use or modification of this
+	source code is governed by the license provided here:
+	https://github.com/Mierdin/todd/blob/master/LICENSE
 */
 
 package api
 
 import (
-    "encoding/json"
-    "fmt"
-    "github.com/mierdin/todd/agent/defs"
-    "github.com/mierdin/todd/config"
-    "github.com/mierdin/todd/db"
-    "net/http"
+	"encoding/json"
+	"fmt"
+	"github.com/Mierdin/todd/agent/defs"
+	"github.com/Mierdin/todd/db"
+	"net/http"
+	"strings"
 )
 
 func (tapi ToDDApi) Agent(w http.ResponseWriter, r *http.Request) {
 
-    // Retrieve query values
-    values := r.URL.Query()
+	// Retrieve query values
+	values := r.URL.Query()
 
-    var agent_list []defs.AgentAdvert
+	var agent_list []defs.AgentAdvert
 
-    // TODO(mierdin): better config
-    cfg := config.GetConfig("/etc/server_config.cfg")
-    var tdb = db.NewToddDB(cfg)
+	var tdb = db.NewToddDB(tapi.cfg)
 
-    // Make sure UUID string is provided
-    if uuid, ok := values["uuid"]; ok {
+	// Make sure UUID string is provided
+	if uuid, ok := values["uuid"]; ok {
 
-        // Make sure UUID string actually contains something
-        if len(uuid[0]) > 0 {
-            agent_list = tdb.DatabasePackage.GetAgents(uuid[0])
-        }
+		// Make sure UUID string actually contains something
+		if len(uuid[0]) > 0 {
+			// Let's get the full list so we can identify the right agent if the user specified a short
+			full_agent_list := tdb.DatabasePackage.GetAgents()
 
-    } else { // UUID not provided; get all agents
-        agent_list = tdb.DatabasePackage.GetAgents("")
-    }
+			for i := range full_agent_list {
+				if strings.HasPrefix(full_agent_list[i].Uuid, uuid[0]) {
+					agent_list = append(agent_list, tdb.DatabasePackage.GetAgent(full_agent_list[i].Uuid))
+					break
+				}
+			}
 
-    response, err := json.MarshalIndent(agent_list, "", "  ")
+		} else { // UUID not provided; get all agents
+			agent_list = tdb.DatabasePackage.GetAgents()
+		}
 
-    if err != nil {
-        panic(err)
-    }
+	} else { // UUID not provided; get all agents
+		agent_list = tdb.DatabasePackage.GetAgents()
+	}
 
-    fmt.Fprint(w, string(response))
+	// If there are no agents, return an empty slice, not a nil slice - this
+	// prevents this API from returning "null"
+	if agent_list == nil {
+		agent_list = []defs.AgentAdvert{}
+	}
+
+	response, err := json.MarshalIndent(agent_list, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Fprint(w, string(response))
 }

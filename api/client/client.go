@@ -1,7 +1,9 @@
 /*
-   ToDD Client API
+   ToDD Client API Calls
 
-   Copyright 2015 - Matt Oswalt
+    Copyright 2016 Matt Oswalt. Use or modification of this
+    source code is governed by the license provided here:
+    https://github.com/Mierdin/todd/blob/master/LICENSE
 */
 
 package api

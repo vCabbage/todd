@@ -1,53 +1,100 @@
 /*
-   ToDD Agent
+	Primary entry point for ToDD Agent
 
-   Copyright 2015 - Matt Oswalt
+	Copyright 2016 Matt Oswalt. Use or modification of this
+	source code is governed by the license provided here:
+	https://github.com/Mierdin/todd/blob/master/LICENSE
 */
 
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
 	"time"
 
-	log "github.com/mierdin/todd/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/mierdin/todd/agent/defs"
-	"github.com/mierdin/todd/comms"
-	"github.com/mierdin/todd/config"
-	"github.com/mierdin/todd/facts"
+	"github.com/Mierdin/todd/agent/cache"
+	"github.com/Mierdin/todd/agent/defs"
+	"github.com/Mierdin/todd/agent/facts"
+	"github.com/Mierdin/todd/agent/testing"
+	"github.com/Mierdin/todd/comms"
+	"github.com/Mierdin/todd/config"
+	"github.com/Mierdin/todd/hostresources"
+	log "github.com/Sirupsen/logrus"
 )
 
+// Command-line Arguments
+var arg_config string
+
 func init() {
+
+	flag.Usage = func() {
+		fmt.Print(`Usage: todd-agent [OPTIONS] COMMAND [arg...]
+
+    An extensible framework for providing natively distributed testing on demand
+
+    Options:
+      --config="/etc/todd/agent.cfg"          Absolute path to ToDD agent config file`, "\n\n")
+
+		os.Exit(0)
+	}
+
+	flag.StringVar(&arg_config, "config", "/etc/todd/agent.cfg", "ToDD agent config file location")
+	flag.Parse()
+
 	// TODO(moswalt): Implement configurable loglevel in server and agent
 	log.SetLevel(log.DebugLevel)
 }
 
 func main() {
 
-	//TODO (moswalt): Need to make this configurable
-	cfg := config.GetConfig("/etc/agent_config.cfg")
+	cfg := config.GetConfig(arg_config)
 
-	// Create an AgentAdvert instance to represent this particular agent
-	var me defs.AgentAdvert
+	// Set up cache
+	var ac = cache.NewAgentCache(cfg)
+	ac.Init()
 
 	// Generate UUID
-	me.Uuid = generateUuid()
+	uuid := hostresources.GenerateUuid()
+	ac.SetKeyValue("uuid", uuid)
 
-	log.Infof("ToDD Agent Activated: %s", me.Uuid)
+	log.Infof("ToDD Agent Activated: %s", uuid)
+
+	// Start test data reporting service
+	go testing.WatchForFinishedTestRuns(cfg)
 
 	// Construct comms package
 	var tc = comms.NewToDDComms(cfg)
 
-	// Spawn goroutine to remediate any fact issues when informed by server
-	go tc.CommsPackage.ListenForFactRemediationNotice(me.Uuid)
+	// Spawn goroutine to listen for tasks issued by server
+	go tc.CommsPackage.ListenForTasks(uuid) // Need to convert this to a generic "listenfortasks" function. This will offload incoming messages
+
+	// Watch for changes to group membership
+	go tc.CommsPackage.WatchForGroup()
 
 	// Continually advertise agent status into message queue
 	for {
 
-		// Generate list of locally installed collectors and set FactCollectors
-		me.FactCollectors = facts.GetFactCollectors(cfg)
+		// Gather assets here as a map, and refer to a key in that map in the below struct
+		gatheredAssets := GetLocalAssets(cfg)
 
-		// Retrieve facts for this agent
-		me.Facts = facts.GetFacts(cfg)
+		var defaultaddr string
+		if cfg.LocalResources.IPAddrOverride != "" {
+			defaultaddr = cfg.LocalResources.IPAddrOverride
+		} else {
+			defaultaddr = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
+		}
+
+		// Create an AgentAdvert instance to represent this particular agent
+		me := defs.AgentAdvert{
+			Uuid:           uuid,
+			DefaultAddr:    defaultaddr,
+			FactCollectors: gatheredAssets["factcollectors"],
+			Testlets:       gatheredAssets["testlets"],
+			Facts:          facts.GetFacts(cfg),
+			LocalTime:      time.Now().UTC(),
+		}
 
 		// Advertise this agent
 		tc.CommsPackage.AdvertiseAgent(me)

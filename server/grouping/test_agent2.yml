@@ -1,9 +1,0 @@
----
-# Example grouping file
-
-label: test-agents
-
-matches:
-
-- hostname: "[A-Z]+"
-- int_subnet: "10.12.0.0/24"

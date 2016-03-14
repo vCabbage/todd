@@ -1,1 +1,1 @@
-In order to compile the agent on Raspberry Pi (GOlang 1.0.2 for ARM) I had to set the environment variable GOARM to "5"
+In order to compile the agent on Raspberry Pi, make sure to set the environment variable GOARM to "5"

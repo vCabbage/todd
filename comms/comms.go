@@ -1,16 +1,24 @@
 /*
-   ToDD comms functions
+    ToDD comms functions
 
     This file holds the infrastructure for agent-server communication abstractions in ToDD.
 
-   Copyright 2015 - Matt Oswalt
+	Copyright 2016 Matt Oswalt. Use or modification of this
+	source code is governed by the license provided here:
+	https://github.com/Mierdin/todd/blob/master/LICENSE
 */
 
 package comms
 
 import (
-    "github.com/mierdin/todd/agent/defs"
-    "github.com/mierdin/todd/config"
+	"os"
+
+	log "github.com/Sirupsen/logrus"
+
+	"github.com/Mierdin/todd/agent/defs"
+	"github.com/Mierdin/todd/agent/responses"
+	"github.com/Mierdin/todd/agent/tasks"
+	"github.com/Mierdin/todd/config"
 )
 
 // CommsPackage will ensure that whatever specific comms struct is loaded at compile time will support
@@ -18,38 +26,49 @@ import (
 // represents a list of things that the server and agents do on the message queue.
 type CommsPackage interface {
 
-    // TODO(mierdin) best way to document interface or function args?
+	// TODO(mierdin) best way to document interface or function args?
 
-    // (agent advertisement to advertise)
-    AdvertiseAgent(defs.AgentAdvert)
+	// (agent advertisement to advertise)
+	AdvertiseAgent(defs.AgentAdvert)
 
-    // (map of collectors:hashes)
-    ListenForAgent(map[string]string)
+	// (map of assets:hashes)
+	ListenForAgent(map[string]map[string]string)
 
-    // (uuid)
-    ListenForFactRemediationNotice(string)
+	// (uuid)
+	ListenForTasks(string)
 
-    // (uuid, remediations)
-    SendFactRemediationNotice(string, []string)
+	// (queuename, task)
+	SendTask(string, tasks.Task)
+
+	// watches for new group membership instructions in the cache and reregisters
+	WatchForGroup()
+
+	ListenForGroupTasks(string, chan bool)
+
+	ListenForResponses(*chan bool)
+	SendResponse(responses.Response)
 }
 
 // toddComms is a struct to hold anything that satisfies the CommsPackage interface
 type toddComms struct {
-    CommsPackage
+	CommsPackage
 }
 
 // NewToDDComms will create a new instance of toddComms, and load the desired
 // CommsPackage-compatible comms package into it.
 func NewToDDComms(cfg config.Config) *toddComms {
 
-    // Create comms instance
-    var tc toddComms
+	var tc toddComms
 
-    // Set CommsPackage to desired package
-    // TODO(mierdin): Need to make this dynamic based on config
-    var rmq RabbitMQComms
-    rmq.config = cfg
-    tc.CommsPackage = rmq
+	// Load the appropriate comms package based on config file
+	switch cfg.Comms.Plugin {
+	case "rabbitmq":
+		tc.CommsPackage = newRabbitMQComms(cfg)
+	default:
+		log.Error("Invalid comms plugin in config file")
+		os.Exit(1)
+	}
 
-    return &tc
+	return &tc
+
 }

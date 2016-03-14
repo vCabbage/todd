@@ -1,109 +1,167 @@
 /*
-   ToDD Client
+    ToDD Client - Primary entrypoint
 
-   Copyright 2015 - Matt Oswalt
+	Copyright 2016 Matt Oswalt. Use or modification of this
+	source code is governed by the license provided here:
+	https://github.com/Mierdin/todd/blob/master/LICENSE
 */
 
 package main
 
 import (
-    "flag"
-    "fmt"
-    "os"
+	"os"
 
-    capi "github.com/mierdin/todd/api/client"
-    "github.com/mierdin/todd/common"
+	capi "github.com/Mierdin/todd/api/client"
+	cli "github.com/codegangsta/cli"
 )
 
-func printVersion() {
-    fmt.Printf("ToDD %s\n", common.VERSION)
-    os.Exit(0)
-}
-
-// Command-line Arguments
-var arg_host string
-var arg_port string
-var arg_version bool
-var arg_loglevel string
-var arg_help bool
-
-func init() {
-
-    // TODO(moswalt): can you also support shorter flags simultaneously?
-
-    flag.Usage = func() {
-        fmt.Print(`Usage: todd-client [OPTIONS] COMMAND [arg...]
-
-    An extensible framework for providing natively distributed testing on demand
-
-    Options:
-      --host="localhost"          ToDD server hostname
-      --port="8080"               ToDD server port
-      --log-level=info            Set the logging level
-      --help                	  Print usage
-      --version                   Print version information and quit
-
-    Commands:
-        agent            Show agent information
-
-    Run 'todd-client COMMAND --help' for more information on a command.`, "\n\n")
-
-        os.Exit(0)
-        //TODO (moswalt): implement keyword-specific arguments - may want to move these to another file
-    }
-
-    flag.StringVar(&arg_host, "host", "localhost", "ToDD server hostname")
-    flag.StringVar(&arg_port, "port", "8080", "ToDD server port")
-    flag.BoolVar(&arg_version, "version", false, "Print version information and quit")
-    flag.StringVar(&arg_loglevel, "log-level", "info", "Set logging level")
-    flag.BoolVar(&arg_help, "h", false, "Print usage")
-    flag.Parse()
-}
-
 func main() {
-    if arg_help {
-        flag.Usage()
-        os.Exit(0)
-    }
 
-    if arg_version {
-        printVersion()
-        os.Exit(0)
-    }
+	var clientapi capi.ClientApi
 
-    // Create conf map
-    // TODO(moswalt): This may need to be a struct
-    conf := map[string]string{}
-    conf["host"] = arg_host
-    conf["port"] = arg_port
+	app := cli.NewApp()
+	app.Name = "todd"
+	app.Version = "v0.1.0"
+	app.Usage = "A highly extensible framework for distributed testing on demand"
 
-    // Ensure that positional arguments are provided
-    if len(flag.Args()) == 0 {
-        flag.Usage()
-        os.Exit(0)
-    } else {
+	var host, port string
 
-        var clientapi capi.ClientApi
+	// global level flags
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:        "H, host",
+			Usage:       "ToDD server hostname",
+			Value:       "localhost",
+			Destination: &host,
+		},
+		cli.StringFlag{
+			Name:        "P, port",
+			Usage:       "ToDD server API port",
+			Value:       "8080",
+			Destination: &port,
+		},
+	}
 
-        // Call appropriate function based on positional arguent
-        switch flag.Args()[0] {
-        case "agent":
-            clientapi.Agent(conf, flag.Args()[1:])
-        case "groupfile":
-            clientapi.GroupFile(conf, flag.Args()[1:])
-        }
-    }
+	// ToDD Commands
+	app.Commands = []cli.Command{
+
+		// "todd agents ..."
+		{
+			Name:  "agents",
+			Usage: "Show ToDD agent information",
+			Action: func(c *cli.Context) {
+				clientapi.Agents(
+					map[string]string{
+						"host": host,
+						"port": port,
+					},
+					c.Args().First(),
+				)
+			},
+		},
+
+		// "todd create ..."
+		{
+			Name:  "create",
+			Usage: "Create ToDD object (group, testrun, etc.)",
+			Action: func(c *cli.Context) {
+				clientapi.Create(
+					map[string]string{
+						"host": host,
+						"port": port,
+					},
+					c.Args()[0],
+				)
+			},
+		},
+
+		// "todd delete ..."
+		{
+			Name:  "delete",
+			Usage: "Delete ToDD object",
+			Action: func(c *cli.Context) {
+				clientapi.Delete(
+					map[string]string{
+						"host": host,
+						"port": port,
+					},
+					c.Args()[0],
+					c.Args()[1],
+				)
+			},
+		},
+
+		// "todd groups ..."
+		{
+			Name:  "groups",
+			Usage: "Show current agent-to-group mappings",
+			Action: func(c *cli.Context) {
+				clientapi.Groups(
+					map[string]string{
+						"host": host,
+						"port": port,
+					},
+				)
+			},
+		},
+
+		// "todd objects ..."
+		{
+			Name:  "objects",
+			Usage: "Show information about installed group objects",
+			Action: func(c *cli.Context) {
+				clientapi.Objects(
+					map[string]string{
+						"host": host,
+						"port": port,
+					},
+					c.Args()[0],
+				)
+			},
+		},
+
+		// "todd run ..."
+		{
+			Name: "run",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "j",
+					Usage: "Output test data for this testrun when finished",
+				},
+				cli.BoolFlag{
+					Name:  "y",
+					Usage: "Skip confirmation and run referenced testrun immediately",
+				},
+				cli.StringFlag{
+					Name:  "source-group",
+					Usage: "The name of the source group",
+				},
+				cli.StringFlag{
+					Name:  "source-app",
+					Usage: "The app to run for this test",
+				},
+				cli.StringFlag{
+					Name:  "source-args",
+					Usage: "Arguments to pass to the testlet",
+				},
+			},
+			Usage: "Execute an already uploaded testrun object",
+			Action: func(c *cli.Context) {
+				clientapi.Run(
+					map[string]string{
+						"host":        host,
+						"port":        port,
+						"sourceGroup": c.String("source-group"),
+						"sourceApp":   c.String("source-app"),
+						"sourceArgs":  c.String("source-args"),
+					},
+					c.Args()[0],
+					c.Bool("j"),
+					c.Bool("y"),
+				)
+			},
+		},
+	}
+
+	app.Run(os.Args)
 }
-
-// TODO(moswalt): This is something docker is doing. See if this is useful
-// type command struct {
-//     name        string
-//     description string
-// }
-
-// var (
-//     toddCommands = []command{
-//         {"agent", "Show detailed information about an agent"},
-//         {"agentlist", "Build an image from a Dockerfile"},
-//     }
-// )

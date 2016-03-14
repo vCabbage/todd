@@ -1,64 +1,75 @@
 ToDD
 ====
+[![Build Status](https://travis-ci.com/Mierdin/todd.svg?token=k3waDSHzjHga6AqNt7hL&branch=master)](https://travis-ci.com/Mierdin/todd)
+[![Documentation Status](https://readthedocs.org/projects/todd/badge/?version=latest)](http://todd.readthedocs.org/en/latest/?badge=latest)
+
 ToDD stands for "Testing on Demand: Distributed!". ToDD is an extensible framework for providing natively distributed testing on demand.
 
-Modern testing frameworks do a great job of performing their test suite, but often don't consider how to scale-up their testing software until much later, if they do at all. As a result, each testing application must independently consider how to scale beyond the limitations of a single host, and implement this in a specific way. That's a lot of duplicated time and code!
+# Overview
 
-ToDD provides a set of tools that remove the need for a testing application to worry about the complexities of operating in a distributed manner. Using these tools, an operations team can deploy any testing application within ToDD, and take advantage of the benefits of a fully distributed model. Because of this distributed model, ToDD helps to guarantee test diversity - instead of simply testing between two points, which can be fairly isolated, ToDD helps to encourage utilization of more of your infrastructure, so that any failures or shortcomings can be discovered more quickly.
+Traditionally, the tooling used by network engineers to confirm continued network operation after any kind of change to the network is fairly limited. After a change, a network engineer may run "ping" or "traceroute" from their machine, or perhaps call some application owners to ensure that their apps are still working. Unfortunately, there is a very big difference in network activity between a 3AM change window and peak user activity during the day.
 
-In addition, ToDD treats post-test analytics as a first-class citizen. There is an incredible amount of value in being able to definitively see the impact of an infrastructure change, by first taking a baseline, and then running the same test after a change. ToDD makes this super easy to do, and brings a whole new level of operational awareness to deploying applications.
+What's needed is a way to:
 
-ToDD is designed to be totally stateless. All state is moved into the database layer. For instance, if ToDD is sitting on top of etcd, then etcd holds all state information, such as what agents are currently registered with the server.
+- Describe a specific application that uses the network, in a simple text format
+- Artificially produce network traffic that matches this description, at a comparable scale to real-work network activity.
 
-# Quickstart
+ToDD is a framework through which you can deploy simple test-oriented applications in a distributed manner. With ToDD, you distribute agents around your infrastructure in any place where you feel additional "testing power" is warranted. Then, these agents can be leveraged to mimic real-world network utilization by actually running those same applications at a large scale.
 
-The best way to run ToDD is with Docker. The Makefile found in this repository heavily favors a Docker-based build and run environment. First, compile ToDD with make:
-    
-    make
+Here are some key features provided by ToDD:
 
-Then you can run all required components within Docker containers with:
+- **Highly Extensible** - ToDD uses an extremely generic interface (called testlets) for running applications, so that users can very easily augment ToDD to support a new application.
+- **Post-Test Analytics** - made possible by integration with a time-series database, such as influxdb. With this, engineers can schedule ToDD test runs to occur periodically, and observe the testrun metrics changing over time.
+- **Grouping** - ToDD performs testruns from groups of agents, instead of one specific agent. The user will provide a set of rules that place a given agent into a group (such as hostname, or ip subnet), and ToDD will instruct all agents in that group to perform the test. This means that the power of a test can be increased by simply spinning up additional agents in that group.
+- **Diverse Target Types** - test runs can be configured to target a list of "dumb" targets (targets that are not running a ToDD agent), or a ToDD group. This is useful for certain applications where it's useful to be able to set up both ends of a test (i.e. setting up a webserver and then testing against it with curl, or setting up an iperf client/server combo)
 
-    make run
+# Documentation
 
-However, if you wish to compile and run ToDD directly, you can also run this to compile and install ToDD binaries on the local OS:
+Documentation for ToDD is available [here](http://todd.readthedocs.org/en/latest/). Note that in the time immediately following the release, these docs will be constantly updated, so don't fret if these pages are a bit empty for the next few weeks.
 
-    make install
+# Getting Started
 
-Assuming you started ToDD with "make run", you should see three containers running:
+The best way to get ToDD running is by leveraging the Vagrantfile provided in this repository. This Vagrantfile comes with an Ansible playbook, so the simplest way to get this environment kicked off is:
 
-    ~$ docker ps                                                                                                            
-    CONTAINER ID        IMAGE                   COMMAND                  CREATED             STATUS              PORTS                                             NAMES
-    0159b39a634e        mierdin/todd            "todd-agent"             46 minutes ago      Up 46 minutes                                                         todd-agent
-    67a60abfb39b        mierdin/todd            "todd-server"            46 minutes ago      Up 46 minutes       0.0.0.0:8080->8080/tcp                            todd-server
-    375adfb27e86        rabbitmq:3-management   "/docker-entrypoint.s"   46 minutes ago      Up 46 minutes       0.0.0.0:5672->5672/tcp, 0.0.0.0:8090->15672/tcp   todd-rabbit
+    git clone git@github.com/Mierdin/todd.git
+    cd todd/
+    vagrant up
 
-You can run todd-client within it's own container to query agent status (this example's docker host is running at 192.168.59.103)
+Wait for the Ansible playbook to finish, and when it's done, you will have a VM with the Go environment set up for you, and ready for you to perform an install.
 
-    ~$ docker run mierdin/todd todd-client --host="192.168.59.103" --port="8080" agent
-    -------------------------------------------------------
-    Agent UUID:  19ebbed51d1891a1ffa6cdd65e203ee322ebf35d924ced40cb1c80a6dd106ee5
-    Enabled:  false
-    Last Seen:  15.722431ms
-    Hostname:  0159b39a634e
-    -------------------------------------------------------
+To install, SSH into the VM and use the provided Makefile:
 
-# Features
+    vagrant ssh
+    cd ~/go/src/github.com/Mierdin/todd
+    sudo -E GOPATH=/home/vagrant/go PATH=$PATH:/home/vagrant/go make install
+    todd --help
 
-ToDD provides the following features:
+That last command should show the ToDD help output - if you see this, ToDD has been installed!
 
-- 100% user-defined, YAML-based application manifests, so that any application can be distributed and run within ToDD.
-- Post-test analytics, made possible by a time-series database. See the impact of infrastructure changes very easily by looking at two or more test runs.
-- Extensible grouping mechanism - be as granular as you want to be regarding the systems participating in a test.
-- Diverse target types - can test against other ToDD agents, or uncontrolled systems.
+There is also a handy script for starting a few containers that are useful for running ToDD. Not only is ToDD available as a docker container (downloadable from Docker Hub) but the script will also spin up some infrastructure that ToDD will use to communicate with agents, or store test data:
 
-# Architecture
+    scripts/start-containers.sh
 
-Summary of architecture in lieu of formal documentation:
+This script will kill any already-running containers, but if this is the first time running this script, it's a handy tool to get all of these services started quickly. The Ansible playbook accompanying this vagrantfile will set up Docker on the VM, so you should be able to run this script right away.
 
-- All message queue calls are centralized, and made as generic as possible. This will allow us to move to a more pluggable message queue abstraction down the road
+You can, of course, set up your own machine, and just use the provided makefile. If you do this, you must ensure the following is done:
 
-# Disclaimer
+- Your Go installation is available to the user you're running, and your GOPATH is set correctly. Basically, you have a working Go configuration.
+- You have added $GOPATH/bin to your PATH
+- You have internet access (we need to "go get" a few tools during the build)
 
-Contributors to ToDD are doing so as independent contributors. No contribution to this project should contain any intellectual property of any contributor's employer (past or present).
+Assuming the above criteria have been met, you should be ready to run "make install". Once this has finished, you should be able to run the "todd-server", "todd-agent", and "todd" binaries from your shell.
 
-(This section really needs more - maybe a terms of contribution?)
+# Docker
+
+A Docker container for ToDD [is available from Docker Hub](https://hub.docker.com/r/mierdin/todd/):
+
+    docker pull mierdin/todd
+
+# Contributing
+
+If you want to contribute some code to ToDD, please review [CONTRIBUTING.md](https://github.com/Mierdin/todd/blob/master/CONTRIBUTING.md) first.
+
+# WARNING
+
+With great power comes great responsibility. Do not use ToDD for any purposes other than to test your own infrastructure. ToDD was not created for nefarious reasons, and you alone are responsible for how you use ToDD.

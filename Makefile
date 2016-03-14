@@ -1,73 +1,50 @@
 #SHELL := /bin/bash
 
-# all: prepare todd-server todd-client todd-agent clean
-
-all: install_deps build
-
-# prepare: install_deps
-# 	rm -rf build/
-# 	mkdir -p build/
-# 	rm -f $(GOPATH)/bin/todd-server
-# 	rm -f $(GOPATH)/bin/todd-client
-# 	rm -f $(GOPATH)/bin/todd-agent
-
+all: install_deps compile
 
 clean:
 	rm -rf build/
 	rm -f $(GOPATH)/bin/todd-server
-	rm -f $(GOPATH)/bin/todd-client
+	rm -f $(GOPATH)/bin/todd
 	rm -f $(GOPATH)/bin/todd-agent
-	# add stop containers and kill processes here?
 
-build: clean
-	mkdir -p build/
-	mkdir -p assets/
-	go-bindata -o assets/factcollectors_unpack.go -pkg="assets" facts/collectors/...
-	GOPATH=$$(pwd)/Godeps/_workspace:$$GOPATH; cd server && go build -o ../build/todd-server
-	GOPATH=$$(pwd)/Godeps/_workspace:$$GOPATH; cd client && go build -o ../build/todd-client
-	GOPATH=$$(pwd)/Godeps/_workspace:$$GOPATH; cd agent && go build -o ../build/todd-agent
+build: compile
 	docker build -t mierdin/todd -f Dockerfile .
+	rm -rf build/
 
-build-no-docker: clean
+compile: install_deps clean
 	mkdir -p build/
 	mkdir -p assets/
-	go-bindata -o assets/factcollectors_unpack.go -pkg="assets" facts/collectors/...
-	GOPATH=$$(pwd)/Godeps/_workspace:$$GOPATH; cd server && go build -o ../build/todd-server
-	GOPATH=$$(pwd)/Godeps/_workspace:$$GOPATH; cd client && go build -o ../build/todd-client
-	GOPATH=$$(pwd)/Godeps/_workspace:$$GOPATH; cd agent && go build -o ../build/todd-agent
-
-start:
-	scripts/start-containers.sh
-
-stop:
-	scripts/stop-containers.sh
-
-# clusterclean:
-# 	rm -rf test/uploads*
-
-# run: reticulum
-# 	./reticulum -config=test/config0.json
+	$(GOPATH)/bin/go-bindata -o assets/assets_unpack.go -pkg="assets" agent/...
+	cd server && godep go build -o ../build/todd-server
+	cd client && godep go build -o ../build/todd
+	cd agent && godep go build -o ../build/todd-agent
 
 fmt:
 	go fmt github.com/mierdin/todd/...
 
-install: build-no-docker
-	cp -f build/todd-server $(GOPATH)/bin
-	cp -f build/todd-client $(GOPATH)/bin
-	cp -f build/todd-agent $(GOPATH)/bin
+configureenv:
+	mkdir -p /etc/todd
+	cp -f etc/agent.cfg /etc/todd/agent.cfg
+	cp -r etc/server.cfg /etc/todd/server.cfg
+	mkdir -p /opt/todd/agent/assets/factcollectors
+	mkdir -p /opt/todd/server/assets/factcollectors
+	mkdir -p /opt/todd/agent/assets/testlets
+	mkdir -p /opt/todd/server/assets/testlets
+	chmod -R 777 /opt/todd
+
+install: install_deps configureenv compile
+	cp -f build/todd-server $(GOPATH)/bin/todd-server
+	cp -f build/todd $(GOPATH)/bin/todd
+	cp -f build/todd-agent $(GOPATH)/bin/todd-agent
 	rm -rf build/
 
-# test: reticulum
-# 	go test .
-
-# coverage: reticulum
-# 	go test . -coverprofile=coverage.out
-# 	go tool cover -html=coverage.out -o coverage.html
+test: 
+	godep go test ./... -cover
 
 install_deps:
 	go get github.com/tools/godep
-	go get -u github.com/jteeuwen/go-bindata/...	
-	GOPATH=$$(godep path) godep restore
+	go get -u github.com/jteeuwen/go-bindata/...
 
 update_deps:
-	godep save -r ./...
+	godep save ./...

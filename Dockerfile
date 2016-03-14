@@ -1,29 +1,30 @@
-FROM golang:1.5
+# This dockerfile is intended to build a minimal version of the todd container.
+# It should be built using the provided makefile ("make build"), to ensure the
+# binaries are compiled properly.
+
+FROM debian:jessie
 MAINTAINER Matt Oswalt <matt@keepingitclassless.net> (@mierdin)
 
 LABEL version="0.1"
 
-# Install godep
-RUN go get github.com/tools/godep
+env PATH /go/bin:$PATH
 
-RUN mkdir -p /tmp/factcollectors
-RUN mkdir -p /tmp/agentfactcollectors
+RUN mkdir /etc/todd
 
-# Upload ToDD source
-COPY . /go/src/github.com/mierdin/todd
+RUN mkdir -p /opt/todd/agent/assets/factcollectors
+RUN mkdir -p /opt/todd/server/assets/factcollectors
+RUN mkdir -p /opt/todd/agent/assets/testlets
+RUN mkdir -p /opt/todd/server/assets/testlets
 
-COPY etc/agent_config.cfg /etc/agent_config.cfg
-COPY etc/server_config.cfg /etc/server_config.cfg
+RUN apt-get update \
+ && apt-get install -y vim curl iperf
 
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
+# Copy ToDD binaries
+COPY ./build/todd /go/bin/
+COPY ./build/todd-server /go/bin/
+COPY ./build/todd-agent /go/bin/
 
-WORKDIR /go/src/github.com/mierdin/todd
-
-RUN godep restore
-
-
-# Remove all this - only copy the binaries, and leave the building to the makefile
-RUN cd server && go build -o /go/bin/todd-server
-RUN cd client && go build -o /go/bin/todd-client
-RUN cd agent && go build -o /go/bin/todd-agent
+COPY ./etc/agent.cfg /etc/todd/agent.cfg
+COPY ./etc/server.cfg /etc/todd/server.cfg
+COPY ./etc/agent-dev.cfg /etc/todd/agent-dev.cfg
+COPY ./etc/server-dev.cfg /etc/todd/server-dev.cfg
