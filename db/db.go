@@ -11,66 +11,63 @@
 package db
 
 import (
-	"os"
+	"errors"
 
 	"github.com/Mierdin/todd/agent/defs"
 	"github.com/Mierdin/todd/config"
 	"github.com/Mierdin/todd/server/objects"
-	log "github.com/Sirupsen/logrus"
+)
+
+var (
+	ErrInvalidDBPlugin = errors.New("Invalid DB plugin in config file")
 )
 
 // DatabasePackage represents all of the behavior that a ToDD database plugin must support
 type DatabasePackage interface {
 
 	// (no args)
-	Init()
+	Init() error
 
 	// (agent advertisement to set)
-	SetAgent(defs.AgentAdvert)
+	SetAgent(defs.AgentAdvert) error
 
-	GetAgent(string) defs.AgentAdvert
-	GetAgents() []defs.AgentAdvert
+	GetAgent(string) (*defs.AgentAdvert, error)
+	GetAgents() ([]defs.AgentAdvert, error)
 
 	// (agent advertisement to remove)
-	RemoveAgent(defs.AgentAdvert)
+	RemoveAgent(defs.AgentAdvert) error
 
-	SetObject(objects.ToddObject)
-	GetObjects(string) []objects.ToddObject
-	DeleteObject(string, string)
+	SetObject(objects.ToddObject) error
+	GetObjects(string) ([]objects.ToddObject, error)
+	DeleteObject(string, string) error
 
-	GetGroupMap() map[string]string
-	SetGroupMap(map[string]string)
+	GetGroupMap() (map[string]string, error)
+	SetGroupMap(map[string]string) error
 
 	// Testing
 	InitTestRun(string, map[string]map[string]string) error
 	SetAgentTestStatus(string, string, string) error
-	GetTestStatus(string) map[string]string
+	GetTestStatus(string) (map[string]string, error)
 	SetAgentTestData(string, string, string) error
-	GetAgentTestData(string, string) map[string]string
-	WriteCleanTestData(string, string)
-	GetCleanTestData(string) string
+	GetAgentTestData(string, string) (map[string]string, error)
+	WriteCleanTestData(string, string) error
+	GetCleanTestData(string) (string, error)
 }
 
-// toddDatabase is a struct to hold anything that satisfies the databasePackage interface
-type toddDatabase struct {
-	DatabasePackage
-}
-
-// NewToDDComms will create a new instance of toddDatabase, and load the desired
+// NewToddDB will create a new instance of toddDatabase, and load the desired
 // databasePackage-compatible comms package into it.
-func NewToddDB(cfg config.Config) *toddDatabase {
+func NewToddDB(cfg config.Config) (DatabasePackage, error) {
 
 	// Create toddDatabase instance
-	var tdb toddDatabase
+	var tdb DatabasePackage
 
 	// Load the appropriate DB package based on config file
 	switch cfg.DB.Plugin {
 	case "etcd":
-		tdb.DatabasePackage = newEtcdDB(cfg)
+		tdb = newEtcdDB(cfg)
 	default:
-		log.Error("Invalid DB plugin in config file")
-		os.Exit(1)
+		return nil, ErrInvalidDBPlugin
 	}
 
-	return &tdb
+	return tdb, nil
 }

@@ -55,12 +55,20 @@ func main() {
 	assets := serveAssets(cfg)
 
 	// Perform database initialization tasks
-	var tdb = db.NewToddDB(cfg)
-	tdb.DatabasePackage.Init()
+	tdb, err := db.NewToddDB(cfg)
+	if err != nil {
+		log.Fatalf("Error setting up database: %v\n", err)
+	}
+
+	if err := tdb.Init(); err != nil {
+		log.Fatalf("Error initializing database: %v\n", err)
+	}
 
 	// Initialize API
 	var tapi toddapi.ToDDApi
-	go tapi.Start(cfg)
+	go func() {
+		log.Fatal(tapi.Start(cfg))
+	}()
 
 	// Start listening for agent advertisements
 	var tc = comms.NewToDDComms(cfg)
