@@ -15,6 +15,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/objects"
 	"github.com/Mierdin/todd/server/testrun"
 )
@@ -80,16 +81,19 @@ func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
 	testUUID := r.URL.Query().Get("testUuid")
 
 	// Make sure UUID string is provided
-	if testUUID != "" {
+	if testUUID == "" {
 		http.Error(w, "Error, test UUID not provided.", 400)
+		return
 	}
-
-	fmt.Fprint(w, "Error, test UUID not found.")
 
 	testData, err := tapi.tdb.GetCleanTestData(testUUID)
 	if err != nil {
-		// TODO(kale): Check for key not existing and send 404
-		http.Error(w, "Internal Error", 500)
+		switch err {
+		case db.ErrNotExist:
+			http.Error(w, "Error, test UUID not found.", 404)
+		default:
+			http.Error(w, "Internal Error", 500)
+		}
 		return
 	}
 

@@ -20,6 +20,7 @@ import (
 
 var (
 	ErrInvalidDBPlugin = errors.New("Invalid DB plugin in config file")
+	ErrNotExist        = errors.New("Value does not exist")
 )
 
 // DatabasePackage represents all of the behavior that a ToDD database plugin must support

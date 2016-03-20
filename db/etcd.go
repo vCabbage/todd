@@ -565,10 +565,15 @@ func (etcddb *etcdDB) GetCleanTestData(testUUID string) (string, error) {
 	log.Debug("Retrieving clean test data for ", testUUID)
 
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
-	if err != nil {
-		log.Error(err)
-		log.Errorf("Error - empty test data: %s", testUUID)
-		return "", err
+	if err, ok := err.(client.Error); ok {
+		switch err.Code {
+		case client.ErrorCodeKeyNotFound:
+			return "", ErrNotExist
+		default:
+			log.Error(err)
+			log.Errorf("Error - empty test data: %s", testUUID)
+			return "", err
+		}
 	}
 
 	return string(resp.Node.Value), nil
