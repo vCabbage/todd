@@ -25,9 +25,11 @@ Here are some key features provided by ToDD:
 - **Grouping** - ToDD performs testruns from groups of agents, instead of one specific agent. The user will provide a set of rules that place a given agent into a group (such as hostname, or ip subnet), and ToDD will instruct all agents in that group to perform the test. This means that the power of a test can be increased by simply spinning up additional agents in that group.
 - **Diverse Target Types** - Test runs can be configured to target a list of "dumb" targets (targets that are not running a ToDD agent), or a ToDD group. This is useful for certain applications where you need to be able to set up both ends of a test (i.e. setting up a webserver and then testing against it with curl, or setting up an iperf client/server combo)
 
-# Documentation
+# Resources
 
 Documentation for ToDD is available [here](http://todd.readthedocs.org/en/latest/). Note that in the time immediately following the release, these docs will be constantly updated, so don't fret if these pages are a bit empty for the next few weeks.
+
+The [ToDD mailing list](https://groups.google.com/forum/#!forum/todd-dev) is also an excellent place to get some support from the community, or to have a discussion about a feature or problem with ToDD.
 
 # Getting Started
 

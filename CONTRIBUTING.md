@@ -1,7 +1,7 @@
 ToDD Contribution Guide
 ====
 
-If you're thinking about contributing, then before you write any code, please contact me first, preferably by opening a Github Issue on this repository. In these early days, ToDD is going through a lot of changes, and I would hate for you to waste your time writing code that I may already be writing, or that I no longer need.
+If you're thinking about contributing, then before you write any code, please communicate with the ToDD community first. In these early days, ToDD is going through a lot of changes, and I would hate for you to waste your time writing code that may already be in progress, or no longer needed. For any immediate issues, please open a Github issue, and be specific about the problem you're having and/or would like to tackle. For longer conversations, please use the [mailing list](https://groups.google.com/forum/#!forum/todd-dev).
 
 I am still building out the CI pipeline, but I will be fairly strict about contributions with respect to Golang idioms and proper unit/integration testing. Now that ToDD is open sourced, I want to focus on these much more, and as a result I want to make sure contributions help, not hurt this effort. Here are some resources that may help you in this regard:
 
