@@ -11,8 +11,8 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"os"
 
+	"github.com/Mierdin/todd/db"
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/Mierdin/todd/config"
@@ -20,11 +20,19 @@ import (
 
 type ToDDApi struct {
 	cfg config.Config
+	tdb db.DatabasePackage
 }
 
-func (tapi ToDDApi) Start(cfg config.Config) {
+func (tapi ToDDApi) Start(cfg config.Config) error {
 
 	tapi.cfg = cfg
+
+	tdb, err := db.NewToddDB(tapi.cfg)
+	if err != nil {
+		return err
+	}
+
+	tapi.tdb = tdb
 
 	// TODO(mierdin): This needs a lot of work. Not only is the version very static
 	// (which is okay for now until we hit a new version)
@@ -42,9 +50,5 @@ func (tapi ToDDApi) Start(cfg config.Config) {
 	serve_url := fmt.Sprintf("%s:%s", tapi.cfg.API.Host, tapi.cfg.API.Port)
 
 	log.Infof("Serving ToDD Server API at: %s\n", serve_url)
-	err := http.ListenAndServe(serve_url, nil)
-	if err != nil {
-		log.Error("Error starting API")
-		os.Exit(1)
-	}
+	return http.ListenAndServe(serve_url, nil)
 }

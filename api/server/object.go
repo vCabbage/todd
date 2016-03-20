@@ -26,26 +26,22 @@ import (
 // or this may be a specific type, such as "/group".
 func (tapi ToDDApi) ListObjects(w http.ResponseWriter, r *http.Request) {
 
-	var object_list []objects.ToddObject
-
-	var tdb = db.NewToddDB(tapi.cfg)
-
 	// See if the client is trying to list all objects
 	if r.URL.String() == "/v1/object/all" {
 		log.Warn("/v1/object/all function currently unsupported")
-	} else {
-		// Derive specific type from URL
-		obj_type := strings.Split(r.URL.String(), "/")[3]
-		object_list = tdb.DatabasePackage.GetObjects(obj_type)
+		return
 	}
 
-	// If there are no objects, return an empty slice, not a nil slice - this
-	// prevents this API from returning "null"
-	if object_list == nil {
-		object_list = []objects.ToddObject{}
+	// Derive specific type from URL
+	objType := strings.Split(r.URL.String(), "/")[3]
+	objectList, err := tapi.tdb.GetObjects(objType)
+	if err != nil {
+		log.Errorln(err)
+		http.Error(w, "Internal Error", 500)
+		return
 	}
 
-	response, err := json.MarshalIndent(object_list, "", "  ")
+	response, err := json.MarshalIndent(objectList, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -77,9 +73,12 @@ func (tapi ToDDApi) CreateObject(w http.ResponseWriter, r *http.Request) {
 	// Generate a more specific Todd Object based on the JSON data
 	finalobj := baseobj.ParseToddObject(body)
 
-	var tdb = db.NewToddDB(tapi.cfg)
-
-	tdb.DatabasePackage.SetObject(finalobj)
+	err = tapi.tdb.SetObject(finalobj)
+	if err != nil {
+		log.Errorln(err)
+		http.Error(w, "Internal Error", 500)
+		return
+	}
 }
 
 // DeleteObject will decode a JSON object from a client request to determine the type and label of the
@@ -88,18 +87,14 @@ func (tapi ToDDApi) DeleteObject(w http.ResponseWriter, r *http.Request) {
 
 	deleteInfo := make(map[string]string)
 
-	body, err := ioutil.ReadAll(r.Body)
+	err := json.NewDecoder(r.Body).Decode(&deleteInfo)
 	if err != nil {
 		panic(err)
 	}
 
-	err = json.Unmarshal(body, &deleteInfo)
+	err = tapi.tdb.DeleteObject(deleteInfo["label"], deleteInfo["type"])
 	if err != nil {
 		log.Error(err)
 		panic(err)
 	}
-
-	var tdb = db.NewToddDB(tapi.cfg)
-
-	tdb.DatabasePackage.DeleteObject(deleteInfo["label"], deleteInfo["type"])
 }

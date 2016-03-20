@@ -22,9 +22,12 @@ func (tapi ToDDApi) Agent(w http.ResponseWriter, r *http.Request) {
 	// Retrieve query values
 	values := r.URL.Query()
 
-	var agent_list []defs.AgentAdvert
-
-	var tdb = db.NewToddDB(tapi.cfg)
+	agentList, err := tapi.tdb.GetAgents()
+	if err != nil {
+		log.Errorln(err)
+		http.Error(w, "Internal Error", 500)
+		return
+	}
 
 	// Make sure UUID string is provided
 	if uuid, ok := values["uuid"]; ok {

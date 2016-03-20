@@ -26,13 +26,13 @@ import (
 // return a map that contains the resulting group for each agent UUID.
 func CalculateGroups(cfg config.Config) {
 
-	tdb := db.NewToddDB(cfg)
+	tdb, _ := db.NewToddDB(cfg)
 
 	// Retrieve all currently active agents
-	agents := tdb.DatabasePackage.GetAgents()
+	agents, _ := tdb.GetAgents()
 
 	// Retrieve all objects with type "group"
-	group_objs := tdb.DatabasePackage.GetObjects("group")
+	group_objs, _ := tdb.GetObjects("group")
 
 	// Cast retrieved slice of ToddObject interfaces to actual GroupObjects
 	groups := make([]objects.GroupObject, len(group_objs))
@@ -69,7 +69,7 @@ next:
 	}
 
 	// Write results to database
-	tdb.DatabasePackage.SetGroupMap(groupmap)
+	tdb.SetGroupMap(groupmap)
 
 	// Send notifications to each agent to let them know what group they're in, so they can cache it
 	var tc = comms.NewToDDComms(cfg)

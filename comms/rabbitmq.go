@@ -840,8 +840,8 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				// TODO(mierdin): Need to handle this error
 
 				log.Debugf("Agent %s is '%s' regarding test %s. Writing to DB.", sasr.AgentUuid, sasr.Status, sasr.TestUuid)
-				var tdb = db.NewToddDB(rmq.config)
-				tdb.DatabasePackage.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status)
+				tdb, _ := db.NewToddDB(rmq.config)                                 // TODO(kale) : Handler error
+				tdb.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status) // TODO(kale) : Handler error
 
 			case "TestData":
 
@@ -849,8 +849,8 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				err = json.Unmarshal(d.Body, &utdr)
 				// TODO(mierdin): Need to handle this error
 
-				var tdb = db.NewToddDB(rmq.config)
-				err = tdb.DatabasePackage.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
+				tdb, _ := db.NewToddDB(rmq.config) // TODO(kale) : Handler error
+				err = tdb.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
 				// TODO(mierdin): Need to handle this error
 
 				// Send task to the agent that says to delete the entry
@@ -860,7 +860,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				rmq.SendTask(utdr.AgentUuid, dtdt)
 
 				// FInally, set the status for this agent in the test to "finished"
-				tdb.DatabasePackage.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished")
+				tdb.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished") // TODO(kale) : Handler error
 
 			default:
 				log.Errorf(fmt.Sprintf("Unexpected type value for received response: %s", base_msg.Type))

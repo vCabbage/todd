@@ -22,14 +22,11 @@ func (tapi ToDDApi) Groups(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("Received request for group map")
 
-	var tdb = db.NewToddDB(tapi.cfg)
-
-	groupmap := tdb.DatabasePackage.GetGroupMap()
-
-	// If there are no objects, return an empty slice, not a nil slice - this
-	// prevents this API from returning "null"
-	if groupmap == nil {
-		groupmap = map[string]string{}
+	groupmap, err := tapi.tdb.GetGroupMap()
+	if err != nil {
+		log.Errorln(err)
+		http.Error(w, "Internal Error", 500)
+		return
 	}
 
 	response, err := json.MarshalIndent(groupmap, "", "  ")
