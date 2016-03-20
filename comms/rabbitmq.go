@@ -235,8 +235,8 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 			// Asset list is empty, so we can continue
 			if len(assetList) == 0 {
 
-				var tdb = db.NewToddDB(rmq.config)
-				tdb.DatabasePackage.SetAgent(agent)
+				var tdb, _ = db.NewToddDB(rmq.config)
+				tdb.SetAgent(agent)
 
 				// This block of code checked that the agent time was within a certain range of the server time. If there was a large enough
 				// time skew, the agent advertisement would be rejected.

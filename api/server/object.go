@@ -17,7 +17,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/objects"
 )
 

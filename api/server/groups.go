@@ -14,8 +14,6 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
-
-	"github.com/Mierdin/todd/db"
 )
 
 func (tapi ToDDApi) Groups(w http.ResponseWriter, r *http.Request) {

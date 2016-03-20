@@ -16,7 +16,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/objects"
 	"github.com/Mierdin/todd/server/testrun"
 )
@@ -96,10 +95,9 @@ func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
 
 		// Make sure UUID string actually contains something
 		if len(testUuid[0]) > 0 {
-			testData = tdb.DatabasePackage.GetCleanTestData(testUuid[0])
+			testData, _ = tapi.tdb.GetCleanTestData(testUuid[0])
 		} else {
 			fmt.Fprint(w, "Error, test UUID not found.")
-	testData, err := tapi.tdb.GetCleanTestData(testUUID)
 		}
 
 	} else { // UUID not provided; get all agents
