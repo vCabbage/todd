@@ -26,12 +26,9 @@ import (
 // a registered agent, and this function will output more detailed information about that agent.
 func (capi ClientApi) Agents(conf map[string]string, agentUUID string) {
 
-	var url string
-
+	url := fmt.Sprintf("http://%s:%s/v1/agent", conf["host"], conf["port"])
 	if agentUUID != "" {
-		url = fmt.Sprintf("http://%s:%s/v1/agent?uuid=%s", conf["host"], conf["port"], agentUUID)
-	} else {
-		url = fmt.Sprintf("http://%s:%s/v1/agent", conf["host"], conf["port"])
+		url = fmt.Sprintf("%s?uuid=%s", url, agentUUID)
 	}
 
 	resp, err := http.Get(url)
@@ -55,14 +52,9 @@ func (capi ClientApi) Agents(conf map[string]string, agentUUID string) {
 		panic(err)
 	}
 
-	if len(records) == 0 {
+	if len(records) == 0 || records[0].Uuid == "" {
 		fmt.Println("No agents found.")
-		os.Exit(0)
-	} else {
-		if records[0].Uuid == "" {
-			fmt.Println("No agents found.")
-			os.Exit(0)
-		}
+		return
 	}
 
 	// If no UUID was provided, get all agents
@@ -87,28 +79,21 @@ func (capi ClientApi) Agents(conf map[string]string, agentUUID string) {
 		}
 		fmt.Fprintln(w)
 		w.Flush()
+		return
+	}
 
-	} else {
+	// TODO(moswalt): if nothing found, API should return either null or empty slice, and client should handle this
+	// Output retrieved data
+	err = agentFactsTemplate.Execute(os.Stdout, records)
+	if err != nil {
+		fmt.Printf("Error displaying agent facts: %v", err)
+	}
+}
 
-		// TODO(moswalt): if nothing found, API should return either null or empty slice, and client should handle this
-		tmpl, err := template.New("test").Parse(
-			`Agent UUID:  {{.Uuid}}
+var agentFactsTemplate = template.Must(template.New("test").Parse(
+	`{{range .}}Agent UUID:  {{.Uuid}}
 Expires:  {{.Expires}}
 Collector Summary: {{.CollectorSummary}}
 Facts:
-{{.PPFacts}}` + "\n")
-
-		if err != nil {
-			panic(err)
-		}
-
-		// Output retrieved data
-		for i := range records {
-			err = tmpl.Execute(os.Stdout, records[i])
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-
-}
+{{.PPFacts}}
+{{ end }}`))
