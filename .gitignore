@@ -8,5 +8,6 @@ docs/.Python
 docs/bin/
 docs/include/
 docs/lib/
+docs/_build/
 preso_secret/
 client/repeattest.sh
