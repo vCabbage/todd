@@ -14,33 +14,30 @@ import (
 	"strings"
 
 	"github.com/Mierdin/todd/agent/defs"
+	log "github.com/Sirupsen/logrus"
 )
 
 func (tapi ToDDApi) Agent(w http.ResponseWriter, r *http.Request) {
 	agentList, err := tapi.tdb.GetAgents()
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
 
 	// Make sure UUID string is provided
 	if uuid := r.URL.Query().Get("uuid"); uuid != "" {
-		for i := 0; len(agentList); i++ {
-			if strings.HasPrefix(agentList[i].Uuid, uuid[0]) {
+		for i := range agentList {
+			if strings.HasPrefix(agentList[i].Uuid, uuid) {
 				agentList = []defs.AgentAdvert{agentList[i]}
 				break
 			}
 		}
 	}
 
-	// If there are no agents, return an empty slice, not a nil slice - this
-	// prevents this API from returning "null"
-	if agentList == nil {
-		agentList = []defs.AgentAdvert{}
-	}
-
 	response, err := json.MarshalIndent(agentList, "", "  ")
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}

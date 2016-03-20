@@ -35,12 +35,14 @@ func (tapi ToDDApi) ListObjects(w http.ResponseWriter, r *http.Request) {
 	objType := strings.Split(r.URL.String(), "/")[3]
 	objectList, err := tapi.tdb.GetObjects(objType)
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
 
 	response, err := json.MarshalIndent(objectList, "", "  ")
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
@@ -56,6 +58,7 @@ func (tapi ToDDApi) CreateObject(w http.ResponseWriter, r *http.Request) {
 	// (we're doing this so we can access the JSON contents more than once)
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
@@ -64,6 +67,7 @@ func (tapi ToDDApi) CreateObject(w http.ResponseWriter, r *http.Request) {
 	var baseobj objects.BaseObject
 	err = json.Unmarshal(body, &baseobj)
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
@@ -71,8 +75,9 @@ func (tapi ToDDApi) CreateObject(w http.ResponseWriter, r *http.Request) {
 	// Generate a more specific Todd Object based on the JSON data
 	finalobj := baseobj.ParseToddObject(body)
 
-	err := tapi.tdb.SetObject(finalobj)
+	err = tapi.tdb.SetObject(finalobj)
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
@@ -84,14 +89,16 @@ func (tapi ToDDApi) DeleteObject(w http.ResponseWriter, r *http.Request) {
 
 	deleteInfo := make(map[string]string)
 
-	err = json.NewDecoder(w).Decode(&deleteInfo)
+	err := json.NewDecoder(r.Body).Decode(&deleteInfo)
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
 
 	err = tapi.tdb.DeleteObject(deleteInfo["label"], deleteInfo["type"])
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}

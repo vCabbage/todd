@@ -11,7 +11,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"text/tabwriter"
@@ -39,15 +39,16 @@ func (capi ClientApi) Groups(conf map[string]string) {
 
 	// Defer the closing of the body
 	defer resp.Body.Close()
-	// Read the content into a byte array
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
+
+	if resp.StatusCode > 299 {
+		fmt.Printf("Error from API: %d - ", resp.StatusCode)
+		io.Copy(os.Stdout, resp.Body)
+		return
 	}
 
 	// Marshal API data into map
 	var groupmap map[string]string
-	err = json.Unmarshal(body, &groupmap)
+	err = json.NewDecoder(resp.Body).Decode(&groupmap)
 	if err != nil {
 		panic(err)
 	}

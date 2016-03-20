@@ -70,7 +70,7 @@ func main() {
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
+					c.Args().First(),
 				)
 			},
 		},
@@ -85,8 +85,8 @@ func main() {
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
-					c.Args()[1],
+					c.Args().First(),
+					c.Args().Get(1),
 				)
 			},
 		},
@@ -115,7 +115,7 @@ func main() {
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
+					c.Args().First(),
 				)
 			},
 		},
@@ -155,7 +155,7 @@ func main() {
 						"sourceApp":   c.String("source-app"),
 						"sourceArgs":  c.String("source-args"),
 					},
-					c.Args()[0],
+					c.Args().First(),
 					c.Bool("j"),
 					c.Bool("y"),
 				)

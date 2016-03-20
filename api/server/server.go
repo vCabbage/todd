@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Mierdin/todd/db"
 	log "github.com/Sirupsen/logrus"
-	"github.com/mierdin/todd/db"
 
 	"github.com/Mierdin/todd/config"
 )

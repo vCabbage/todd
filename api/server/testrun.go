@@ -11,12 +11,10 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/objects"
 	"github.com/Mierdin/todd/server/testrun"
 )
@@ -33,7 +31,7 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 	}{}
 
 	// Marshal API data into our struct
-	err = json.NewDecoder(r.Body).(&testRunInfo)
+	err := json.NewDecoder(r.Body).Decode(&testRunInfo)
 	if err != nil {
 		http.Error(w, "Internal Error", 500)
 		return
@@ -49,7 +47,7 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 	// See if the requested object name exists within the current object store
 	testRunExists := false
 	var finalObj objects.ToddObject
-	for i:=0; i<len(objectList); i++ {
+	for i := range objectList {
 		if objectList[i].GetLabel() == testRunInfo.TestRunName {
 			testRunExists = true
 			finalObj = objectList[i]
@@ -78,7 +76,7 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 // TestData will retrieve clean test data by test UUID
 func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
 	var testData string
-	
+
 	testUUID := r.URL.Query().Get("testUuid")
 
 	// Make sure UUID string is provided
@@ -88,7 +86,7 @@ func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprint(w, "Error, test UUID not found.")
 
-	testData, err = tapi.tdb.GetCleanTestData(testUUID)
+	testData, err := tapi.tdb.GetCleanTestData(testUUID)
 	if err != nil {
 		// TODO(kale): Check for key not existing and send 404
 		http.Error(w, "Internal Error", 500)

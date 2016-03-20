@@ -21,12 +21,14 @@ func (tapi ToDDApi) Groups(w http.ResponseWriter, r *http.Request) {
 
 	groupmap, err := tapi.tdb.GetGroupMap()
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}
 
 	response, err := json.MarshalIndent(groupmap, "", "  ")
 	if err != nil {
+		log.Errorln(err)
 		http.Error(w, "Internal Error", 500)
 		return
 	}

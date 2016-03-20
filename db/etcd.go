@@ -50,19 +50,14 @@ type etcdDB struct {
 
 func (etcddb *etcdDB) Init() error {
 
-	resp, err := etcddb.keysAPI.Get(context.Background(), "/todd/agents", &client.GetOptions{Recursive: true})
-	if err != nil {
-		return err
+	_, err := etcddb.keysAPI.Get(context.Background(), "/todd/agents", &client.GetOptions{Recursive: true})
+	if err == nil {
+		log.Info("Deleting '/todd/agents' key")
+		_, err = etcddb.keysAPI.Delete(context.Background(), "/todd/agents", &client.DeleteOptions{Recursive: true, Dir: true})
+		if err != nil {
+			return err
+		}
 	}
-
-	log.Info("Deleting '/todd/agents' key")
-	resp, err = etcddb.keysAPI.Delete(context.Background(), "/todd/agents", &client.DeleteOptions{Recursive: true, Dir: true})
-	if err != nil {
-		return err
-	}
-
-	// print common key info
-	log.Printf("Set is done. Metadata is %q\n", resp)
 
 	// TODO(mierdin): Consider deleting the entire /todd key here, and recreating all of the various subkeys, just to start from scratch.
 	// Shouldn't need any previous data if you restart the server.
@@ -144,7 +139,7 @@ func nodeToAgentAdvert(node *client.Node, expectedUUID string) (*defs.AgentAdver
 // GetAgents will retrieve all agents from the database
 func (etcddb *etcdDB) GetAgents() ([]defs.AgentAdvert, error) {
 
-	var retAdv []defs.AgentAdvert
+	retAdv := []defs.AgentAdvert{}
 
 	log.Print("Getting /todd/agents' key value")
 
@@ -153,7 +148,7 @@ func (etcddb *etcdDB) GetAgents() ([]defs.AgentAdvert, error) {
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
 	if err != nil {
 		log.Warn("Agent list empty when queried")
-		return nil, err
+		return retAdv, nil
 	}
 
 	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
@@ -213,7 +208,7 @@ func (etcddb *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
 	if err != nil {
 		log.Warn("ToDD object store empty when queried")
-		return nil, err
+		return retObj, nil
 	}
 
 	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
@@ -327,7 +322,7 @@ func (etcddb *etcdDB) GetGroupMap() (map[string]string, error) {
 	if err != nil {
 		fmt.Println(err)
 		log.Warn("Error retrieving group mapping")
-		return nil, err
+		return retMap, nil
 	}
 
 	// Marshal etcd data into map

@@ -11,7 +11,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"text/tabwriter"
@@ -21,43 +21,36 @@ import (
 	"github.com/Mierdin/todd/hostresources"
 )
 
-// Agent will query the ToDD server for a list of currently registered agents, and will display
+// Agents will query the ToDD server for a list of currently registered agents, and will display
 // a list of them to the user. Optionally, the user can provide a subargument containing the UUID of
 // a registered agent, and this function will output more detailed information about that agent.
-func (capi ClientApi) Agents(conf map[string]string, agentUuid string) {
+func (capi ClientApi) Agents(conf map[string]string, agentUUID string) {
 
 	var url string
 
-	if agentUuid != "" {
-		url = fmt.Sprintf("http://%s:%s/v1/agent?uuid=%s", conf["host"], conf["port"], agentUuid)
+	if agentUUID != "" {
+		url = fmt.Sprintf("http://%s:%s/v1/agent?uuid=%s", conf["host"], conf["port"], agentUUID)
 	} else {
 		url = fmt.Sprintf("http://%s:%s/v1/agent", conf["host"], conf["port"])
 	}
 
-	// Build the request
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	// Send the request via a client
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.Get(url)
 	if err != nil {
 		panic(err)
 	}
 
 	// Defer the closing of the body
 	defer resp.Body.Close()
-	// Read the content into a byte array
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
+
+	if resp.StatusCode > 299 {
+		fmt.Printf("Error from API: %d - ", resp.StatusCode)
+		io.Copy(os.Stdout, resp.Body)
+		return
 	}
 
 	// Marshal API data into object
 	var records []defs.AgentAdvert
-	err = json.Unmarshal(body, &records)
+	err = json.NewDecoder(resp.Body).Decode(&records)
 	if err != nil {
 		panic(err)
 	}
@@ -73,7 +66,7 @@ func (capi ClientApi) Agents(conf map[string]string, agentUuid string) {
 	}
 
 	// If no UUID was provided, get all agents
-	if agentUuid == "" {
+	if agentUUID == "" {
 
 		w := new(tabwriter.Writer)
 
