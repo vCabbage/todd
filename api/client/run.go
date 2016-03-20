@@ -137,11 +137,12 @@ func (capi ClientApi) Run(conf map[string]string, testrunName string, displayRep
 
 	// display it to the user if desired
 	if sourceGroup != "" || displayReport {
-		b, err := json.MarshalIndent(data, "", "  ")
+		var buf bytes.Buffer
+		err := json.Indent(&buf, data, "", "  ")
 		if err != nil {
 			fmt.Println("error:", err)
 		}
-		fmt.Println(string(b))
+		buf.WriteTo(os.Stdout)
 	}
 
 	os.Exit(0)
@@ -149,9 +150,7 @@ func (capi ClientApi) Run(conf map[string]string, testrunName string, displayRep
 
 var errNoTestResult = errors.New("No test result")
 
-func getRunResult(conf map[string]string, testUUID string) (map[string]map[string]map[string]string, error) {
-	var data map[string]map[string]map[string]string
-
+func getRunResult(conf map[string]string, testUUID string) ([]byte, error) {
 	// Go back and get our testrun data
 	url := fmt.Sprintf("http://%s:%s/v1/testdata?testUuid=%s", conf["host"], conf["port"], testUUID)
 
@@ -167,19 +166,19 @@ func getRunResult(conf map[string]string, testUUID string) (map[string]map[strin
 		return nil, errNoTestResult
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return data, nil
+	return body, nil
 }
 
 func listenForTestStatus(conf map[string]string) error {
 	retries := 0
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:8081", conf["host"]))
 	for err != nil {
-		if retries < 5 {
+		if retries > 5 {
 			fmt.Println("Failed to subscribe to test event stream after several retries.")
 			return errors.New("session failed")
 		}
@@ -233,16 +232,13 @@ func listenForTestStatus(conf map[string]string) error {
 
 		// Print the status line (note the \r which keeps the same line in place on the terminal)
 		fmt.Printf(
-			"\r %s INIT: (%d/%d)  READY: (%d/%d)  TESTING: (%d/%d)  FINISHED: (%d/%d)",
+			"\r %[1]s INIT: (%[3]d/%[2]d)  READY: (%[4]d/%[2]d)  TESTING: (%[5]d/%[2]d)  FINISHED: (%[6]d/%[2]d)",
 			time.Now(),
+			recordCount,
 			init,
-			recordCount,
 			ready,
-			recordCount,
 			testing,
-			recordCount,
 			finished,
-			recordCount,
 		)
 
 		if finished == recordCount {
