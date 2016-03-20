@@ -66,7 +66,9 @@ func main() {
 
 	// Initialize API
 	var tapi toddapi.ToDDApi
-	go log.Fatal(tapi.Start(cfg))
+	go func() {
+		log.Fatal(tapi.Start(cfg))
+	}()
 
 	// Start listening for agent advertisements
 	var tc = comms.NewToDDComms(cfg)

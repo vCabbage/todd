@@ -11,6 +11,7 @@ package comms
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -38,10 +39,33 @@ type rabbitMQComms struct {
 	config config.Config
 }
 
+func dialRabbitMQ(url string) *amqp.Connection {
+	const retry = 10 * time.Second
+
+	var conn *amqp.Connection
+	var err error
+	for {
+		conn, err = amqp.DialConfig(url, amqp.Config{
+			Dial: func(network, addr string) (net.Conn, error) {
+				return net.DialTimeout(network, addr, 2*time.Second)
+			},
+		})
+		if err == nil {
+			break
+		}
+
+		log.Error(err)
+		log.Errorf("Failed to connect to RabbitMQ, retrying in %d seconds\n", retry/time.Second)
+		time.Sleep(retry)
+	}
+
+	return conn
+}
+
 // AdvertiseAgent will place an agent advertisement message on the message queue
 func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) {
 
-	queue_url := fmt.Sprintf(
+	queueURL := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
 		rmq.config.AMQP.User,
 		rmq.config.AMQP.Password,
@@ -49,12 +73,7 @@ func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) {
 		rmq.config.AMQP.Port,
 	)
 
-	conn, err := amqp.Dial(queue_url)
-	if err != nil {
-		log.Error(err)
-		log.Error("Failed to connect to RabbitMQ")
-		os.Exit(1)
-	}
+	conn := dialRabbitMQ(queueURL)
 	defer conn.Close()
 
 	ch, err := conn.Channel()
@@ -135,7 +154,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 
 	// TODO(mierdin): does func param need to be a pointer?
 
-	queue_url := fmt.Sprintf(
+	queueURL := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
 		rmq.config.AMQP.User,
 		rmq.config.AMQP.Password,
@@ -143,12 +162,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 		rmq.config.AMQP.Port,
 	)
 
-	conn, err := amqp.Dial(queue_url)
-	if err != nil {
-		log.Error(err)
-		log.Error("Failed to connect to RabbitMQ")
-		os.Exit(1)
-	}
+	conn := dialRabbitMQ(queueURL)
 	defer conn.Close()
 
 	ch, err := conn.Channel()
@@ -185,90 +199,94 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 		os.Exit(1)
 	}
 
-	forever := make(chan bool)
-
-	go func() {
-		for d := range msgs {
-			log.Debugf("Agent advertisement recieved: %s", d.Body)
-
-			var agent defs.AgentAdvert
-			err = json.Unmarshal(d.Body, &agent)
-			// TODO(mierdin): Need to handle this error
-
-			// assetList is a slice that will contain any URLs that need to be sent to an
-			// agent as a response to an incorrect or incomplete list of assets
-			var assetList []string
-
-			// assets is the asset map from the SERVER's perspective
-			for asset_type, asset_hashes := range assets {
-
-				var agentAssets map[string]string
-
-				// agentAssets is the asset map from the AGENT's perspective
-				if asset_type == "factcollectors" {
-					agentAssets = agent.FactCollectors
-				} else if asset_type == "testlets" {
-					agentAssets = agent.Testlets
-				}
-
-				for name, hash := range asset_hashes {
-
-					// See if the hashes match (a missing asset will also result in False)
-					if agentAssets[name] != hash {
-
-						// hashes do not match, so we need to append the asset download URL to the remediate list
-						var default_ip string
-						if rmq.config.LocalResources.IPAddrOverride != "" {
-							default_ip = rmq.config.LocalResources.IPAddrOverride
-						} else {
-							default_ip = hostresources.GetIPOfInt(rmq.config.LocalResources.DefaultInterface).String()
-						}
-						asset_url := fmt.Sprintf("http://%s:%s/%s/%s", default_ip, rmq.config.Assets.Port, asset_type, name)
-
-						assetList = append(assetList, asset_url)
-
-					}
-				}
-
-			}
-
-			// Asset list is empty, so we can continue
-			if len(assetList) == 0 {
-
-				tdb, _ := db.NewToddDB(rmq.config) // TODO(kale) : Handler error
-				tdb.SetAgent(agent)                // TODO(kale) : Handler error
-
-				// This block of code checked that the agent time was within a certain range of the server time. If there was a large enough
-				// time skew, the agent advertisement would be rejected.
-				// I have disabled this for now - My plan was to use this to synchronize testrun execution amongst agents, but I have
-				// a solution to that for now. May revisit this later.
-				//
-				// Determine difference between server and agent time
-				// t1 := time.Now()
-				// var diff float64
-				// diff = t1.Sub(agent.LocalTime).Seconds()
-				//
-				// // If Agent is within half a second of server time, add insert to database
-				// if diff < 0.5 && diff > -0.5 {
-				// } else {
-				// 	// We don't want to register an agent if there is a severe time difference,
-				// 	// in order to ensure continuity during tests. So, just print log message.
-				// 	log.Warn("Agent time not within boundaries.")
-				// }
-
-			} else {
-				log.Warnf("Agent %s did not have the required asset files. This advertisement is ignored.", agent.Uuid)
-
-				var task tasks.DownloadAssetTask
-				task.Type = "DownloadAsset" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-				task.Assets = assetList
-				rmq.SendTask(agent.Uuid, task)
-			}
-		}
-	}()
-
 	log.Infof(" [*] Waiting for messages. To exit press CTRL+C")
-	<-forever
+
+	for d := range msgs {
+		log.Debugf("Agent advertisement recieved: %s", d.Body)
+
+		var agent defs.AgentAdvert
+		err = json.Unmarshal(d.Body, &agent)
+		if err != nil {
+			log.Errorf("ListenForAgent - failed to decode message: %v\n", err)
+			continue
+		}
+		// TODO(mierdin): Need to handle this error
+
+		// assetList is a slice that will contain any URLs that need to be sent to an
+		// agent as a response to an incorrect or incomplete list of assets
+		var assetList []string
+
+		// assets is the asset map from the SERVER's perspective
+		for assetType, assetHashes := range assets {
+
+			var agentAssets map[string]string
+
+			// agentAssets is the asset map from the AGENT's perspective
+			switch assetType {
+			case "factcollectors":
+				agentAssets = agent.FactCollectors
+			case "testlets":
+				agentAssets = agent.Testlets
+			default:
+				log.Errorf("ListenForAgent - unknown asset type: %s\n", assetType)
+				continue
+			}
+
+			for name, hash := range assetHashes {
+				// See if the hashes match (a missing asset will also result in False)
+				if agentAssets[name] == hash {
+					continue
+				}
+
+				// hashes do not match, so we need to append the asset download URL to the remediate list
+				defaultIP := rmq.config.LocalResources.IPAddrOverride
+				if defaultIP == "" {
+					defaultIP = hostresources.GetIPOfInt(rmq.config.LocalResources.DefaultInterface).String()
+				}
+				assetURL := fmt.Sprintf("http://%s:%s/%s/%s", defaultIP, rmq.config.Assets.Port, assetType, name)
+
+				assetList = append(assetList, assetURL)
+			}
+
+		}
+
+		if len(assetList) != 0 {
+			log.Warnf("Agent %s did not have the required asset files. This advertisement is ignored.", agent.Uuid)
+
+			task := tasks.DownloadAssetTask{Assets: assetList}
+			task.Type = "DownloadAsset" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
+			rmq.SendTask(agent.Uuid, task)
+		}
+
+		tdb, err := db.NewToddDB(rmq.config)
+		if err != nil {
+			log.Errorf("ListenForAgent - %v\n", err)
+			continue
+		}
+		err = tdb.SetAgent(agent)
+		if err != nil {
+			log.Errorf("ListenForAgent - %v\n", err)
+			continue
+		}
+
+		// This block of code checked that the agent time was within a certain range of the server time. If there was a large enough
+		// time skew, the agent advertisement would be rejected.
+		// I have disabled this for now - My plan was to use this to synchronize testrun execution amongst agents, but I have
+		// a solution to that for now. May revisit this later.
+		//
+		// Determine difference between server and agent time
+		// t1 := time.Now()
+		// var diff float64
+		// diff = t1.Sub(agent.LocalTime).Seconds()
+		//
+		// // If Agent is within half a second of server time, add insert to database
+		// if diff < 0.5 && diff > -0.5 {
+		// } else {
+		// 	// We don't want to register an agent if there is a severe time difference,
+		// 	// in order to ensure continuity during tests. So, just print log message.
+		// 	log.Warn("Agent time not within boundaries.")
+		// }
+	}
 }
 
 // SendTask will send a task object onto the specified queue ("queueName"). This could be an agent UUID, or a group name. Agents
