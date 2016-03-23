@@ -821,6 +821,12 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 		os.Exit(1)
 	}
 
+	tdb, err := db.NewToddDB(rmq.config) // TODO(vcabbage): Consider moving this into the rabbitMQComms struct
+	if err != nil {
+		log.Error("Failed to connect to DB")
+		os.Exit(1)
+	}
+
 	go func() {
 		for d := range msgs {
 
@@ -840,8 +846,10 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				// TODO(mierdin): Need to handle this error
 
 				log.Debugf("Agent %s is '%s' regarding test %s. Writing to DB.", sasr.AgentUuid, sasr.Status, sasr.TestUuid)
-				tdb, _ := db.NewToddDB(rmq.config)                                 // TODO(kale) : Handler error
-				tdb.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status) // TODO(kale) : Handler error
+				err := tdb.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status)
+				if err != nil {
+					log.Errorf("Error writing agent status to DB: %v", err)
+				}
 
 			case "TestData":
 
@@ -849,7 +857,6 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				err = json.Unmarshal(d.Body, &utdr)
 				// TODO(mierdin): Need to handle this error
 
-				tdb, _ := db.NewToddDB(rmq.config) // TODO(kale) : Handler error
 				err = tdb.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
 				// TODO(mierdin): Need to handle this error
 
@@ -859,8 +866,11 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				dtdt.TestUuid = utdr.TestUuid
 				rmq.SendTask(utdr.AgentUuid, dtdt)
 
-				// FInally, set the status for this agent in the test to "finished"
-				tdb.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished") // TODO(kale) : Handler error
+				// Finally, set the status for this agent in the test to "finished"
+				err := tdb.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished")
+				if err != nil {
+					log.Errorf("Error writing agent status to DB: %v", err)
+				}
 
 			default:
 				log.Errorf(fmt.Sprintf("Unexpected type value for received response: %s", base_msg.Type))
