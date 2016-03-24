@@ -29,3 +29,5 @@ Also, please see the video below for a full demonstration of ToDD in action:
 .. raw:: html
 
     <div style="text-align:center;"><iframe width="560" height="315" src="https://www.youtube.com/embed/_KqIgi4Ebvs" frameborder="0" allowfullscreen></iframe></div>
+
+TODO: Put in high level design and make sure to mention dependencies like rabbitmq, etcd, etc. (in that they're not hard dependencies but currently they are the only implementations)
