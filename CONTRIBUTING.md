@@ -12,4 +12,6 @@ My preferred methodology for contributing is still being worked out, so for the 
 
 Please refer to the .travis.yml file in the root of the repository in order to see the build steps being performed. I will not look at a PR until it produces a passing build, so to save time, try to run these build steps yourself on your own machine first.
 
+Also, and this is important - the smaller and more single-purpose your PRs are, the better. I am happy to review just about any PR that passes the build and seems to be a good idea, but I do have a day job and if you want a quick turnaround, keep them small!
+
 If you're wondering what there is to work on, I try to keep the [issues for this project](https://github.com/Mierdin/todd/issues) populated with any known issues, so feel free to peruse that list.
