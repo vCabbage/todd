@@ -86,7 +86,7 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 // TestData will retrieve clean test data by test UUID
 func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
 	// Make sure UUID string is provided
-	uuid := r.URL.Query().Get("uuid")
+	uuid := r.URL.Query().Get("testUuid")
 	if uuid == "" {
 		fmt.Fprint(w, "Error, test UUID not provided.")
 		return
