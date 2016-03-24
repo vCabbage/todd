@@ -95,9 +95,9 @@ func (etcddb *etcdDB) SetAgent(adv defs.AgentAdvert) error {
 
 // GetAgent will retrieve a specific agent from the database by UUID
 func (etcddb *etcdDB) GetAgent(uuid string) (*defs.AgentAdvert, error) {
-	log.Printf("Getting /todd/agents/%s' key value", uuid)
-
 	keyStr := fmt.Sprintf("/todd/agents/%s", uuid)
+
+	log.Printf("Getting %q key value", keyStr)
 
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
 	if err != nil {
@@ -115,6 +115,7 @@ func (etcddb *etcdDB) GetAgent(uuid string) (*defs.AgentAdvert, error) {
 	return adv, nil
 }
 
+// nodeToAgentAdvert takes a etcd Node representing an AgentAdvert and returns an AgentAdvert
 func nodeToAgentAdvert(node *client.Node, expectedUUID string) (*defs.AgentAdvert, error) {
 	adv := new(defs.AgentAdvert)
 
@@ -128,7 +129,7 @@ func nodeToAgentAdvert(node *client.Node, expectedUUID string) (*defs.AgentAdver
 	// We want to use the TTLDuration field from etcd for simplicity
 	adv.Expires = node.TTLDuration()
 
-	// The etcd key should always match the inner JSON, so let's panic (for now) if this ever happens
+	// The etcd key should always match the inner JSON
 	if expectedUUID != adv.Uuid {
 		return nil, errors.New("UUID in etcd does not match inner JSON text")
 	}
@@ -450,8 +451,7 @@ func (etcddb *etcdDB) GetTestStatus(testUUID string) (map[string]string, error) 
 
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
 	if err != nil {
-		fmt.Println(err)
-		log.Errorf("Error - empty test encountered: %s", testUUID)
+		log.Errorf("Error - empty test encountered for %q: %v", testUUID, err)
 		return retMap, nil
 	}
 

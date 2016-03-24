@@ -85,25 +85,18 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 
 // TestData will retrieve clean test data by test UUID
 func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
-	// Retrieve query values
-	values := r.URL.Query()
-
-	var testData string
-
 	// Make sure UUID string is provided
-	if testUuid, ok := values["testUuid"]; ok {
-
-		// Make sure UUID string actually contains something
-		if len(testUuid[0]) > 0 {
-			testData, _ = tapi.tdb.GetCleanTestData(testUuid[0])
-		} else {
-			fmt.Fprint(w, "Error, test UUID not found.")
-		}
-
-	} else { // UUID not provided; get all agents
+	uuid := r.URL.Query().Get("uuid")
+	if uuid == "" {
 		fmt.Fprint(w, "Error, test UUID not provided.")
+		return
+	}
+
+	testData, err := tapi.tdb.GetCleanTestData(uuid)
+	if err != nil {
+		fmt.Fprint(w, "Error, test UUID not found.")
+		return
 	}
 
 	fmt.Fprint(w, testData)
-
 }
