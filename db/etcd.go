@@ -321,8 +321,7 @@ func (etcddb *etcdDB) GetGroupMap() (map[string]string, error) {
 
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
 	if err != nil {
-		fmt.Println(err)
-		log.Warn("Error retrieving group mapping")
+		log.Warnf("Error retrieving group mapping: %v", err)
 		return retMap, nil
 	}
 
@@ -493,8 +492,7 @@ func (etcddb *etcdDB) GetAgentTestData(testUUID, sourceGroup string) (map[string
 
 	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
 	if err != nil {
-		fmt.Println(err)
-		log.Errorf("Error - empty test encountered: %s", testUUID)
+		log.Errorf("Error - empty test encountered for %q: %v", testUUID, err)
 		return nil, err
 	}
 
