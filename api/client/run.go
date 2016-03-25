@@ -12,12 +12,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -35,7 +35,7 @@ func (capi ClientApi) Run(conf map[string]string, testrunName string, displayRep
 	}
 
 	if !skipConfirm {
-		fmt.Printf("Activate testrun \"%s\"? (y/n):", testrunName)
+		fmt.Printf("Activate testrun %q? (y/n):", testrunName)
 		var userResponse string
 		_, err := fmt.Scanln(&userResponse)
 		if err != nil {
@@ -62,30 +62,28 @@ func (capi ClientApi) Run(conf map[string]string, testrunName string, displayRep
 	}
 
 	// Marshal the final object into JSON
-	json_str, err := json.Marshal(testRunInfo)
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(testRunInfo)
 	if err != nil {
 		panic(err)
 	}
 	// Construct API request, and send POST to server for this object
-	var url string
-	url = fmt.Sprintf("http://%s:%s/v1/testrun/run", conf["host"], conf["port"])
+	url := fmt.Sprintf("http://%s:%s/v1/testrun/run", conf["host"], conf["port"])
 
-	var jsonByte = []byte(json_str)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonByte))
+	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		panic(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
 
 	// Print error if not 200 OK
-	if resp.Status != "200 OK" {
+	if resp.StatusCode > 299 {
 		fmt.Println("response Status:", resp.Status)
 		fmt.Println("response Headers:", resp.Header)
 		os.Exit(1)
@@ -105,154 +103,152 @@ func (capi ClientApi) Run(conf map[string]string, testrunName string, displayRep
 	case "failure":
 		fmt.Println("ERROR - some kind of error was encountered on the server. Test was not run.")
 		os.Exit(1)
-
-	default:
-
-		fmt.Println("")
-
-		testUuid := string(serverResponse)
-
-		firstMessage := false
-		var recordCount int
-
-		fmt.Print("RUNNING TEST: ", testUuid)
-		fmt.Print("\n\n")
-
-		fmt.Println("(Please be patient while the test finishes...)\n")
-
-		retries := 0
-	retry:
-		// connect to this socket
-		conn, err := net.Dial("tcp", fmt.Sprintf("%s:8081", conf["host"]))
-		if err != nil {
-
-			retries = retries + 1
-			time.Sleep(1000 * time.Millisecond)
-			if retries > 5 {
-				fmt.Println("Failed to subscribe to test event stream after several retries.")
-				fmt.Println("Will now watch the testrun metrics API for 45 seconds to see if we get a result that way. Please wait...")
-				goto tcpfailed
-			} else {
-				fmt.Println("Failed to subscribe to test event stream. Retrying...")
-				goto retry
-			}
-		}
-
-		for {
-
-			// listen for reply
-			message, err := bufio.NewReader(conn).ReadString('\n')
-
-			// If an error is raised, it's probably because the server killed the connection
-			if err != nil {
-				// TODO(mierdin): This doesn't really tell us if the connection died because of an error or not
-				break
-			}
-
-			var statuses map[string]string
-			err = json.Unmarshal([]byte(message), &statuses)
-			// TODO (mierdin): Handle error
-
-			if firstMessage == false {
-				recordCount = len(statuses)
-				firstMessage = true
-			}
-
-			init, ready, testing, finished := 0, 0, 0, 0
-			for _, status := range statuses {
-
-				switch status {
-				case "init":
-					init += 1
-				case "ready":
-					ready++
-				case "testing":
-					testing++
-				case "finished":
-					finished++
-				default:
-					fmt.Println("Invalid status recieved.")
-					os.Exit(1)
-				}
-			}
-
-			// Print the status line (note the \r which keeps the same line in place on the terminal)
-			fmt.Printf(
-				"\r %s INIT: (%s/%s)  READY: (%s/%s)  TESTING: (%s/%s)  FINISHED: (%s/%s)",
-				time.Now(),
-				strconv.Itoa(init),
-				strconv.Itoa(recordCount),
-				strconv.Itoa(ready),
-				strconv.Itoa(recordCount),
-				strconv.Itoa(testing),
-				strconv.Itoa(recordCount),
-				strconv.Itoa(finished),
-				strconv.Itoa(recordCount),
-			)
-
-			// Send an ack back to the server to let it know we're alive
-			fmt.Fprintf(conn, "ack\n")
-
-		}
-
-		retries = 0
-
-	tcpfailed:
-
-		// Go back and get our testrun data
-		url = fmt.Sprintf("http://%s:%s/v1/testdata?testUuid=%s", conf["host"], conf["port"], testUuid)
-
-		// Build the request
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			panic(err)
-		}
-
-		// Send the request via a client
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			panic(err)
-		}
-
-		// Defer the closing of the body
-		defer resp.Body.Close()
-		// Read the content into a byte array
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			panic(err)
-		}
-
-		var data map[string]map[string]map[string]string
-		err = json.Unmarshal([]byte(body), &data)
-
-		b, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			fmt.Println("error:", err)
-		}
-		if string(b) == "null" {
-
-			// More than likely, testrun has not yet completed. So, let's wait a bit and retry.
-			retries = retries + 1
-			time.Sleep(1000 * time.Millisecond)
-			if retries > 45 {
-				fmt.Println("Failed to retrieve test data after 45 seconds. Something must be wrong - quitting.")
-				os.Exit(1)
-			} else {
-				goto tcpfailed
-			}
-
-		} else {
-
-			fmt.Println("\n\nDone.\n")
-
-			// display it to the user if desired
-			if sourceGroup != "" || displayReport {
-				fmt.Println(string(b))
-			}
-		}
-
-		os.Exit(0)
 	}
 
+	fmt.Println("")
+
+	testUUID := string(serverResponse)
+
+	fmt.Print("RUNNING TEST: ", testUUID)
+	fmt.Print("\n\n")
+
+	fmt.Println("(Please be patient while the test finishes...)")
+
+	err = listenForTestStatus(conf)
+	if err != nil {
+		fmt.Println(err, "Will now watch the testrun metrics API for 45 seconds to see if we get a result that way. Please wait...")
+	}
+
+	// Poll for results
+	timeout := time.After(45 * time.Second)
+	data, err := getRunResult(conf, testUUID)
+	for err != nil {
+		select {
+		case <-timeout:
+			fmt.Println("Failed to retrieve test data after 45 seconds. Something must be wrong - quitting.")
+			os.Exit(1)
+		default:
+			time.Sleep(1 * time.Second)
+			data, err = getRunResult(conf, testUUID)
+		}
+	}
+
+	fmt.Printf("\n\nDone.\n")
+
+	// display it to the user if desired
+	if sourceGroup != "" || displayReport {
+		var buf bytes.Buffer
+		err := json.Indent(&buf, data, "", "  ")
+		if err != nil {
+			fmt.Printf("error %q: %v\n", string(data), err)
+		}
+		buf.WriteTo(os.Stdout)
+		fmt.Println()
+	}
+
+	os.Exit(0)
+}
+
+var errNoTestResult = errors.New("No test result")
+
+// getRunResult collects the results of test run from the server's REST API
+func getRunResult(conf map[string]string, testUUID string) ([]byte, error) {
+	// Go back and get our testrun data
+	url := fmt.Sprintf("http://%s:%s/v1/testdata?testUuid=%s", conf["host"], conf["port"], testUUID)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	// Defer the closing of the body
+	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		return nil, errNoTestResult
+	}
+
+	return ioutil.ReadAll(resp.Body)
+}
+
+// listenForTestStatus connects to the server's test event stream and prints the progression
+//
+// This blocks until all agents have finished or an error occurs.
+func listenForTestStatus(conf map[string]string) error {
+	retries := 0
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:8081", conf["host"]))
+	for err != nil {
+		if retries > 5 {
+			fmt.Println("Failed to subscribe to test event stream after several retries.")
+			return errors.New("session failed")
+		}
+
+		retries++
+		time.Sleep(1 * time.Second)
+		fmt.Println("Failed to subscribe to test event stream. Retrying...")
+		conn, err = net.Dial("tcp", fmt.Sprintf("%s:8081", conf["host"]))
+	}
+	defer conn.Close()
+
+	var recordCount int
+	firstMessage := false
+	for {
+
+		// listen for reply
+		message, err := bufio.NewReader(conn).ReadString('\n')
+		// If an error is raised, it's probably because the server killed the connection
+		if err != nil {
+			// TODO(mierdin): This doesn't really tell us if the connection died because of an error or not
+			return errors.New("session disconnected")
+		}
+
+		var statuses map[string]string
+		err = json.Unmarshal([]byte(message), &statuses)
+		if err != nil {
+			return fmt.Errorf("Invalid status from server %q: %v", message, err)
+		}
+
+		if !firstMessage {
+			recordCount = len(statuses)
+			firstMessage = true
+		}
+
+		init, ready, testing, finished := 0, 0, 0, 0
+		for _, status := range statuses {
+
+			switch status {
+			case "init":
+				init++
+			case "ready":
+				ready++
+			case "testing":
+				testing++
+			case "finished":
+				finished++
+			default:
+				fmt.Println("Invalid status recieved.")
+				os.Exit(1)
+			}
+		}
+
+		// Print the status line (note the \r which keeps the same line in place on the terminal)
+		fmt.Printf(
+			"\r %[1]s INIT: (%[3]d/%[2]d)  READY: (%[4]d/%[2]d)  TESTING: (%[5]d/%[2]d)  FINISHED: (%[6]d/%[2]d)",
+			time.Now(),
+			recordCount,
+			init,
+			ready,
+			testing,
+			finished,
+		)
+
+		if finished == recordCount {
+			break
+		}
+
+		// Send an ack back to the server to let it know we're alive
+		fmt.Fprintf(conn, "ack\n")
+	}
+
+	return nil
 }
