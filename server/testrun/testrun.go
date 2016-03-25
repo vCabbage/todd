@@ -33,8 +33,14 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 	testUuid := hostresources.GenerateUuid()
 
 	// Retrieve current group map
-	var tdb = db.NewToddDB(cfg)
-	allGroupMap := tdb.DatabasePackage.GetGroupMap()
+	tdb, err := db.NewToddDB(cfg)
+	if err != nil {
+		log.Fatalf("Error connecting to DB: %v", err)
+	}
+	allGroupMap, err := tdb.GetGroupMap()
+	if err != nil {
+		log.Fatalf("Error retrieving group map: %v", err)
+	}
 
 	// sourceOverride is a flag to pass into the executeTest function so that it knows how to return test data if the source group has been overridden
 	sourceOverride := false
@@ -83,7 +89,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 
 	// Initialize test in database. This will create an entry for this test under the UUID we just created, and will also write the
 	// list of agents participating in this test, with some kind of default status, for other goroutines to update with a further status.
-	err := tdb.DatabasePackage.InitTestRun(testUuid, testAgentMap)
+	err = tdb.InitTestRun(testUuid, testAgentMap)
 	if err != nil {
 		log.Fatal("Problem initializing testrun in database.")
 		return "failure"
@@ -101,7 +107,10 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 		// This is a group target type, so we are deriving target IPs from the DefaultAddr property of this agent.
 		var targetIPs []string
 		for uuid, _ := range testAgentMap["targets"] {
-			agent := tdb.GetAgent(uuid)
+			agent, err := tdb.GetAgent(uuid)
+			if err != nil {
+				log.Fatalf("Error retrieving agent: %v", err)
+			}
 			targetIPs = append(targetIPs, agent.DefaultAddr)
 		}
 		sourceTr.Targets = targetIPs
@@ -172,14 +181,20 @@ func executeTestRun(testAgentMap map[string]map[string]string, testUuid string, 
 	// Sleep for 2 seconds so that the client moniting can connect first
 	time.Sleep(2000 * time.Millisecond)
 
-	var tdb = db.NewToddDB(cfg)
+	tdb, err := db.NewToddDB(cfg) // TODO(vcabbage): Pass tdb in instead of creating new connection?
+	if err != nil {
+		log.Fatalf("Error connecting to DB: %v", err)
+	}
 
 	// First, let's just keep retrieving statuses until all of the agents are reporting ready
 readyloop:
 	for {
 		time.Sleep(1000 * time.Millisecond)
 
-		testStatuses := tdb.DatabasePackage.GetTestStatus(testUuid)
+		testStatuses, err := tdb.GetTestStatus(testUuid)
+		if err != nil {
+			log.Fatalf("Error retrieving test status: %v", err)
+		}
 		for _, status := range testStatuses {
 			switch true {
 			case status == "fail":
@@ -213,7 +228,10 @@ readyloop:
 
 			time.Sleep(1000 * time.Millisecond)
 
-			testStatuses := tdb.DatabasePackage.GetTestStatus(testUuid)
+			testStatuses, err := tdb.GetTestStatus(testUuid)
+			if err != nil {
+				log.Fatalf("Error retrieving test status: %v", err)
+			}
 
 			// We're creating this map to hold ONLY the targets that are in testStatuses (which also contains sources)
 			targetStatuses := make(map[string]string)
@@ -263,7 +281,10 @@ finishedloop:
 	for {
 		time.Sleep(1000 * time.Millisecond)
 
-		testStatuses := tdb.DatabasePackage.GetTestStatus(testUuid)
+		testStatuses, err := tdb.GetTestStatus(testUuid)
+		if err != nil {
+			log.Fatalf("Error retrieving test status: %v", err)
+		}
 		for agent, status := range testStatuses {
 			switch true {
 			case status == "fail":
@@ -276,7 +297,10 @@ finishedloop:
 		break
 	}
 
-	uncondensedData := tdb.DatabasePackage.GetAgentTestData(testUuid, trObj.Spec.Source["name"])
+	uncondensedData, err := tdb.GetAgentTestData(testUuid, trObj.Spec.Source["name"])
+	if err != nil {
+		log.Fatalf("Error retrieving agent test data: %v", err)
+	}
 
 	clean_data_map := cleanTestData(uncondensedData)
 
@@ -287,7 +311,7 @@ finishedloop:
 	}
 
 	// Write clean test data to etcd
-	tdb.DatabasePackage.WriteCleanTestData(testUuid, string(clean_data_json))
+	tdb.WriteCleanTestData(testUuid, string(clean_data_json))
 
 	time.Sleep(1000 * time.Millisecond)
 
@@ -377,13 +401,16 @@ retrytcpserver:
 	}
 	defer conn.Close()
 
-	var tdb = db.NewToddDB(cfg)
+	tdb, _ := db.NewToddDB(cfg)
 
 	// Constantly poll for test status, and send statuses to client
 	for {
 		time.Sleep(1000 * time.Millisecond)
 
-		testStatuses := tdb.DatabasePackage.GetTestStatus(testUuid)
+		testStatuses, err := tdb.GetTestStatus(testUuid)
+		if err != nil {
+			log.Fatalf("Error retrieving test status: %v", err)
+		}
 
 		statuses_json, err := json.Marshal(testStatuses)
 		if err != nil {

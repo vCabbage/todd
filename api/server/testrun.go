@@ -16,7 +16,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/objects"
 	"github.com/Mierdin/todd/server/testrun"
 )
@@ -49,16 +48,19 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve list of existing testrun objects
-	var tdb = db.NewToddDB(tapi.cfg)
-	object_list := tdb.DatabasePackage.GetObjects("testrun")
+	objectList, err := tapi.tdb.GetObjects("testrun")
+	if err != nil {
+		http.Error(w, "Internal Error", 500)
+		return
+	}
 
 	// See if the requested object name exists within the current object store
 	testRunExists := false
 	var finalObj objects.ToddObject
-	for i := range object_list {
-		if object_list[i].GetLabel() == testRunInfo.TestRunName {
+	for i := range objectList {
+		if objectList[i].GetLabel() == testRunInfo.TestRunName {
 			testRunExists = true
-			finalObj = object_list[i]
+			finalObj = objectList[i]
 			break
 		}
 	}
@@ -67,44 +69,34 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 	if !testRunExists {
 		log.Warnf("Client requested run of testrun object, but %s was not found.", testRunInfo.TestRunName)
 		fmt.Fprint(w, "notfound")
-	} else {
-
-		// Populate sourceOverrideMap dict
-		sourceOverrideMap := map[string]string{
-			"SourceGroup": testRunInfo.SourceGroup,
-			"SourceApp":   testRunInfo.SourceApp,
-			"SourceArgs":  testRunInfo.SourceArgs,
-		}
-
-		// Send back the testrun UUID
-		testUUID := testrun.Start(tapi.cfg, finalObj.(objects.TestRunObject), sourceOverrideMap)
-		fmt.Fprint(w, testUUID)
 	}
+
+	// Populate sourceOverrideMap dict
+	sourceOverrideMap := map[string]string{
+		"SourceGroup": testRunInfo.SourceGroup,
+		"SourceApp":   testRunInfo.SourceApp,
+		"SourceArgs":  testRunInfo.SourceArgs,
+	}
+
+	// Send back the testrun UUID
+	testUUID := testrun.Start(tapi.cfg, finalObj.(objects.TestRunObject), sourceOverrideMap)
+	fmt.Fprint(w, testUUID)
 }
 
 // TestData will retrieve clean test data by test UUID
 func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
-	// Retrieve query values
-	values := r.URL.Query()
-
-	var tdb = db.NewToddDB(tapi.cfg)
-
-	var testData string
-
 	// Make sure UUID string is provided
-	if testUuid, ok := values["testUuid"]; ok {
-
-		// Make sure UUID string actually contains something
-		if len(testUuid[0]) > 0 {
-			testData = tdb.DatabasePackage.GetCleanTestData(testUuid[0])
-		} else {
-			fmt.Fprint(w, "Error, test UUID not found.")
-		}
-
-	} else { // UUID not provided; get all agents
+	uuid := r.URL.Query().Get("testUuid")
+	if uuid == "" {
 		fmt.Fprint(w, "Error, test UUID not provided.")
+		return
+	}
+
+	testData, err := tapi.tdb.GetCleanTestData(uuid)
+	if err != nil {
+		fmt.Fprint(w, "Error, test UUID not found.")
+		return
 	}
 
 	fmt.Fprint(w, testData)
-
 }

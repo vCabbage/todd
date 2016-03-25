@@ -235,8 +235,8 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 			// Asset list is empty, so we can continue
 			if len(assetList) == 0 {
 
-				var tdb = db.NewToddDB(rmq.config)
-				tdb.DatabasePackage.SetAgent(agent)
+				var tdb, _ = db.NewToddDB(rmq.config)
+				tdb.SetAgent(agent)
 
 				// This block of code checked that the agent time was within a certain range of the server time. If there was a large enough
 				// time skew, the agent advertisement would be rejected.
@@ -821,6 +821,12 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 		os.Exit(1)
 	}
 
+	tdb, err := db.NewToddDB(rmq.config) // TODO(vcabbage): Consider moving this into the rabbitMQComms struct
+	if err != nil {
+		log.Error("Failed to connect to DB")
+		os.Exit(1)
+	}
+
 	go func() {
 		for d := range msgs {
 
@@ -840,8 +846,10 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				// TODO(mierdin): Need to handle this error
 
 				log.Debugf("Agent %s is '%s' regarding test %s. Writing to DB.", sasr.AgentUuid, sasr.Status, sasr.TestUuid)
-				var tdb = db.NewToddDB(rmq.config)
-				tdb.DatabasePackage.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status)
+				err := tdb.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status)
+				if err != nil {
+					log.Errorf("Error writing agent status to DB: %v", err)
+				}
 
 			case "TestData":
 
@@ -849,8 +857,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				err = json.Unmarshal(d.Body, &utdr)
 				// TODO(mierdin): Need to handle this error
 
-				var tdb = db.NewToddDB(rmq.config)
-				err = tdb.DatabasePackage.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
+				err = tdb.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
 				// TODO(mierdin): Need to handle this error
 
 				// Send task to the agent that says to delete the entry
@@ -859,8 +866,11 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				dtdt.TestUuid = utdr.TestUuid
 				rmq.SendTask(utdr.AgentUuid, dtdt)
 
-				// FInally, set the status for this agent in the test to "finished"
-				tdb.DatabasePackage.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished")
+				// Finally, set the status for this agent in the test to "finished"
+				err := tdb.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished")
+				if err != nil {
+					log.Errorf("Error writing agent status to DB: %v", err)
+				}
 
 			default:
 				log.Errorf(fmt.Sprintf("Unexpected type value for received response: %s", base_msg.Type))
