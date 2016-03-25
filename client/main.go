@@ -9,6 +9,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	capi "github.com/Mierdin/todd/api/client"
@@ -50,13 +51,18 @@ func main() {
 			Name:  "agents",
 			Usage: "Show ToDD agent information",
 			Action: func(c *cli.Context) {
-				clientapi.Agents(
+				err, agents := clientapi.Agents(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
 					c.Args().First(),
 				)
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				clientapi.DisplayAgents(agents, !(c.Args().First() == ""))
 			},
 		},
 
