@@ -16,6 +16,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/objects"
 	"github.com/Mierdin/todd/server/testrun"
 )
@@ -86,17 +87,24 @@ func (tapi ToDDApi) Run(w http.ResponseWriter, r *http.Request) {
 // TestData will retrieve clean test data by test UUID
 func (tapi ToDDApi) TestData(w http.ResponseWriter, r *http.Request) {
 	// Make sure UUID string is provided
-	uuid := r.URL.Query().Get("testUuid")
-	if uuid == "" {
-		fmt.Fprint(w, "Error, test UUID not provided.")
+	testUUID := r.URL.Query().Get("testUuid")
+
+	// Make sure UUID string is provided
+	if testUUID == "" {
+		http.Error(w, "Error, test UUID not provided.", 400)
 		return
 	}
 
-	testData, err := tapi.tdb.GetCleanTestData(uuid)
+	testData, err := tapi.tdb.GetCleanTestData(testUUID)
 	if err != nil {
-		fmt.Fprint(w, "Error, test UUID not found.")
+		switch err {
+		case db.ErrNotExist:
+			http.Error(w, "Error, test UUID not found.", 404)
+		default:
+			http.Error(w, "Internal Error", 500)
+		}
 		return
 	}
 
-	fmt.Fprint(w, testData)
+	w.Write([]byte(testData))
 }
