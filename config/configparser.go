@@ -13,45 +13,63 @@ import (
 	"gopkg.in/gcfg.v1"
 )
 
+type AMQP struct {
+	User     string
+	Password string
+	Host     string
+	Port     string
+}
+
+type API struct {
+	Host string
+	Port string
+}
+
+type Assets struct {
+	IP   string
+	Port string
+}
+
+type Comms struct {
+	Plugin string
+}
+
+type DB struct {
+	IP     string
+	Port   string
+	Plugin string
+}
+
+type TSDB struct {
+	IP     string
+	Port   string
+	Plugin string
+}
+
+type Testing struct {
+	Timeout int // seconds
+}
+
+type Grouping struct {
+	Interval int // seconds
+}
+
+type LocalResources struct {
+	DefaultInterface string
+	OptDir           string
+	IPAddrOverride   string
+}
+
 type Config struct {
-	API struct {
-		Host string
-		Port string
-	}
-	AMQP struct {
-		User     string
-		Password string
-		Host     string
-		Port     string
-	}
-	Comms struct {
-		Plugin string
-	}
-	Assets struct {
-		IP   string
-		Port string
-	}
-	DB struct {
-		IP     string
-		Port   string
-		Plugin string
-	}
-	TSDB struct {
-		IP     string
-		Port   string
-		Plugin string
-	}
-	Testing struct {
-		Timeout int
-	}
-	Grouping struct {
-		Interval int // seconds
-	}
-	LocalResources struct {
-		DefaultInterface string
-		OptDir           string
-		IPAddrOverride   string
-	}
+	AMQP           AMQP
+	API            API
+	Assets         Assets
+	Comms          Comms
+	DB             DB
+	TSDB           TSDB
+	Testing        Testing
+	Grouping       Grouping
+	LocalResources LocalResources
 }
 
 func GetConfig(cfgpath string) Config {
