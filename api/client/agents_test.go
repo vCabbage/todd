@@ -10,10 +10,10 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"net/url"
 	"testing"
 	"time"
 
@@ -51,17 +51,25 @@ func TestAgents(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, string(agentJson))
+		w.Write(agentJson)
 	}))
 	defer ts.Close()
 
-	agentsUrl := fmt.Sprintf("%s/v1/agent", ts.URL)
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		t.Error(err)
+	}
 
 	var capi ClientApi
-	err, agents := capi.Agents(
+	agents, err := capi.Agents(
 		map[string]string{
-			"host": strings.Split(strings.Replace(strings.Replace(agentsUrl, "http://", "", 1), "/v1/agent", "", 1), ":")[0],
-			"port": strings.Split(strings.Replace(strings.Replace(agentsUrl, "http://", "", 1), "/v1/agent", "", 1), ":")[1],
+			"host": host,
+			"port": port,
 		}, "",
 	)
 	if err != nil {
@@ -89,7 +97,7 @@ func TestDisplayAgents(t *testing.T) {
 	for _, test := range agentTests {
 		err := capi.DisplayAgents(test.arg1, test.arg2)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}
 }

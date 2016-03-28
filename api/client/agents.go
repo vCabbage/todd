@@ -24,7 +24,7 @@ import (
 // Agents will query the ToDD server for a list of currently registered agents, and will display
 // a list of them to the user. Optionally, the user can provide a subargument containing the UUID of
 // a registered agent, and this function will output more detailed information about that agent.
-func (capi ClientApi) Agents(conf map[string]string, agentUuid string) (error, []defs.AgentAdvert) {
+func (capi ClientApi) Agents(conf map[string]string, agentUuid string) ([]defs.AgentAdvert, error) {
 
 	var agents []defs.AgentAdvert
 
@@ -39,14 +39,14 @@ func (capi ClientApi) Agents(conf map[string]string, agentUuid string) (error, [
 	// Build the request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return err, agents
+		return agents, err
 	}
 
 	// Send the request via a client
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err, agents
+		return agents, err
 	}
 
 	// Defer the closing of the body
@@ -54,16 +54,16 @@ func (capi ClientApi) Agents(conf map[string]string, agentUuid string) (error, [
 	// Read the content into a byte array
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err, agents
+		return agents, err
 	}
 
 	// Marshal API data into object
 	err = json.Unmarshal(body, &agents)
 	if err != nil {
-		return err, agents
+		return agents, err
 	}
 
-	return nil, agents
+	return agents, nil
 }
 
 // DisplayAgents is responsible for displaying a set of Agents to the terminal
