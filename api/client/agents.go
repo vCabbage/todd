@@ -21,10 +21,12 @@ import (
 	"github.com/Mierdin/todd/hostresources"
 )
 
-// Agent will query the ToDD server for a list of currently registered agents, and will display
+// Agents will query the ToDD server for a list of currently registered agents, and will display
 // a list of them to the user. Optionally, the user can provide a subargument containing the UUID of
 // a registered agent, and this function will output more detailed information about that agent.
-func (capi ClientApi) Agents(conf map[string]string, agentUuid string) {
+func (capi ClientApi) Agents(conf map[string]string, agentUuid string) ([]defs.AgentAdvert, error) {
+
+	var agents []defs.AgentAdvert
 
 	var url string
 
@@ -37,14 +39,14 @@ func (capi ClientApi) Agents(conf map[string]string, agentUuid string) {
 	// Build the request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		panic(err)
+		return agents, err
 	}
 
 	// Send the request via a client
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return agents, err
 	}
 
 	// Defer the closing of the body
@@ -52,50 +54,32 @@ func (capi ClientApi) Agents(conf map[string]string, agentUuid string) {
 	// Read the content into a byte array
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		return agents, err
 	}
 
 	// Marshal API data into object
-	var records []defs.AgentAdvert
-	err = json.Unmarshal(body, &records)
+	err = json.Unmarshal(body, &agents)
 	if err != nil {
-		panic(err)
+		return agents, err
 	}
 
-	if len(records) == 0 {
+	return agents, nil
+}
+
+// DisplayAgents is responsible for displaying a set of Agents to the terminal
+func (capi ClientApi) DisplayAgents(agents []defs.AgentAdvert, detail bool) error {
+
+	if len(agents) == 0 {
 		fmt.Println("No agents found.")
-		os.Exit(0)
+		return nil
 	} else {
-		if records[0].Uuid == "" {
+		if agents[0].Uuid == "" {
 			fmt.Println("No agents found.")
-			os.Exit(0)
+			return nil
 		}
 	}
 
-	// If no UUID was provided, get all agents
-	if agentUuid == "" {
-
-		w := new(tabwriter.Writer)
-
-		// Format in tab-separated columns with a tab stop of 8.
-		w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-		fmt.Fprintln(w, "UUID\tEXPIRES\tADDR\tFACT SUMMARY\tCOLLECTOR SUMMARY")
-
-		for i := range records {
-			fmt.Fprintf(
-				w,
-				"%s\t%s\t%s\t%s\t%s\n",
-				hostresources.TruncateID(records[i].Uuid),
-				records[i].Expires,
-				records[i].DefaultAddr,
-				records[i].FactSummary(),
-				records[i].CollectorSummary(),
-			)
-		}
-		fmt.Fprintln(w)
-		w.Flush()
-
-	} else {
+	if detail {
 
 		// TODO(moswalt): if nothing found, API should return either null or empty slice, and client should handle this
 		tmpl, err := template.New("test").Parse(
@@ -106,16 +90,39 @@ Facts:
 {{.PPFacts}}` + "\n")
 
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		// Output retrieved data
-		for i := range records {
-			err = tmpl.Execute(os.Stdout, records[i])
+		for i := range agents {
+			err = tmpl.Execute(os.Stdout, agents[i])
 			if err != nil {
-				panic(err)
+				return err
 			}
 		}
+
+	} else {
+		w := new(tabwriter.Writer)
+
+		// Format in tab-separated columns with a tab stop of 8.
+		w.Init(os.Stdout, 0, 8, 0, '\t', 0)
+		fmt.Fprintln(w, "UUID\tEXPIRES\tADDR\tFACT SUMMARY\tCOLLECTOR SUMMARY")
+
+		for i := range agents {
+			fmt.Fprintf(
+				w,
+				"%s\t%s\t%s\t%s\t%s\n",
+				hostresources.TruncateID(agents[i].Uuid),
+				agents[i].Expires,
+				agents[i].DefaultAddr,
+				agents[i].FactSummary(),
+				agents[i].CollectorSummary(),
+			)
+		}
+		fmt.Fprintln(w)
+		w.Flush()
+
 	}
 
+	return nil
 }

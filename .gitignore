@@ -11,3 +11,4 @@ docs/lib/
 docs/_build/
 preso_secret/
 client/repeattest.sh
+*.out
