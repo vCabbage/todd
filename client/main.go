@@ -51,7 +51,7 @@ func main() {
 			Name:  "agents",
 			Usage: "Show ToDD agent information",
 			Action: func(c *cli.Context) {
-				err, agents := clientapi.Agents(
+				agents, err := clientapi.Agents(
 					map[string]string{
 						"host": host,
 						"port": port,
