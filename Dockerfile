@@ -22,5 +22,3 @@ RUN cd /go/src/github.com/Mierdin/todd && make install
 
 RUN cp /go/src/github.com/Mierdin/todd/etc/server.cfg /etc/todd
 RUN cp /go/src/github.com/Mierdin/todd/etc/agent.cfg /etc/todd
-RUN cp /go/src/github.com/Mierdin/todd/etc/server-dev.cfg /etc/todd
-RUN cp /go/src/github.com/Mierdin/todd/etc/agent-dev.cfg /etc/todd
