@@ -16,9 +16,9 @@ RUN apt-get update \
  && apt-get install -y vim curl iperf
 
 # Install ToDD
-COPY . /src
+COPY . /go/src
 
-RUN cd /src && make install
+RUN cd /go/src && make install
 
 COPY ./etc/agent.cfg /etc/todd/agent.cfg
 COPY ./etc/server.cfg /etc/todd/server.cfg
