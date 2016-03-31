@@ -1,8 +1,4 @@
-# This dockerfile is intended to build a minimal version of the todd container.
-# It should be built using the provided makefile ("make build"), to ensure the
-# binaries are compiled properly.
-
-FROM debian:jessie
+FROM golang:1.5
 MAINTAINER Matt Oswalt <matt@keepingitclassless.net> (@mierdin)
 
 LABEL version="0.1"
@@ -19,10 +15,10 @@ RUN mkdir -p /opt/todd/server/assets/testlets
 RUN apt-get update \
  && apt-get install -y vim curl iperf
 
-# Copy ToDD binaries
-COPY ./build/todd /go/bin/
-COPY ./build/todd-server /go/bin/
-COPY ./build/todd-agent /go/bin/
+# Install ToDD
+COPY . /src
+
+RUN cd /src && make install
 
 COPY ./etc/agent.cfg /etc/todd/agent.cfg
 COPY ./etc/server.cfg /etc/todd/server.cfg
