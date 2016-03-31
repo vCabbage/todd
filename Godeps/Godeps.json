@@ -1,19 +1,14 @@
 {
-	"ImportPath": "github.com/mierdin/todd",
+	"ImportPath": "github.com/Mierdin/todd",
 	"GoVersion": "go1.5.2",
 	"Packages": [
-		"./..."
+		"./api/server"
 	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.8.7-55-gf7f79f7",
 			"Rev": "f7f79f729e0fbe2fcc061db48a9ba0263f588252"
-		},
-		{
-			"ImportPath": "github.com/codegangsta/cli",
-			"Comment": "1.2.0-219-ga294348",
-			"Rev": "a2943485b110df8842045ae0600047f88a3a56a1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
@@ -29,6 +24,14 @@
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
 			"Comment": "v2.3.0-alpha.0-5-g7c9e92d",
 			"Rev": "7c9e92d1d589195cda0e590a31880d889772e92a"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "50c25fb3b2b3b3cc724e9b6ac75fb44b3bccd0da"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "e444e69cbd2e2e3e0749a2f3c717cec491552bbf"
 		},
 		{
 			"ImportPath": "github.com/influxdata/influxdb/client/v2",
@@ -65,10 +68,6 @@
 		{
 			"ImportPath": "gopkg.in/gcfg.v1",
 			"Rev": "0ef1a8547f99b94fac9af5377dd72febba18f37c"
-		},
-		{
-			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
 		}
 	]
 }
