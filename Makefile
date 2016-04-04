@@ -33,7 +33,7 @@ configureenv:
 	mkdir -p /opt/todd/server/assets/testlets
 	chmod -R 777 /opt/todd
 
-install: install_deps configureenv compile
+install: configureenv
 	cp -f build/todd-server /usr/bin
 	cp -f build/todd /usr/bin
 	cp -f build/todd-agent /usr/bin
