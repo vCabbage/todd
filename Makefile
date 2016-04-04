@@ -16,9 +16,9 @@ compile: install_deps clean
 	mkdir -p build/
 	mkdir -p assets/
 	$(GOPATH)/bin/go-bindata -o assets/assets_unpack.go -pkg="assets" agent/...
-	cd server && godep go build -o ../build/todd-server
-	cd client && godep go build -o ../build/todd
-	cd agent && godep go build -o ../build/todd-agent
+	cd server && $(GOPATH)/bin/godep go build -o ../build/todd-server
+	cd client && $(GOPATH)/bin/godep go build -o ../build/todd
+	cd agent && $(GOPATH)/bin/godep go build -o ../build/todd-agent
 
 fmt:
 	go fmt github.com/mierdin/todd/...
@@ -34,9 +34,9 @@ configureenv:
 	chmod -R 777 /opt/todd
 
 install: install_deps configureenv compile
-	cp -f build/todd-server $(GOPATH)/bin/todd-server
-	cp -f build/todd $(GOPATH)/bin/todd
-	cp -f build/todd-agent $(GOPATH)/bin/todd-agent
+	cp -f build/todd-server /usr/bin
+	cp -f build/todd /usr/bin
+	cp -f build/todd-agent /usr/bin
 	rm -rf build/
 
 test: 
