@@ -7,23 +7,29 @@ First, make sure the following software is installed and correctly configured fo
 - Make sure the "bin" directory in your GOPATH is also added to your "PATH"
 - Git
 
-ToDD can be run in a number of ways. The primarily
+Install via Make
+----------
 
-The makefile provided in the repo can be used to easily install
+The best way to install ToDD onto a system is with the provided Makefile. In this section, we'll retrieve the ToDD source, compile into the three ToDD binaries, and install these binaries onto the system.
+
+First, let's ``go get`` the ToDD source. As mentioned at the beginning of this document, this assumes a system where Go has been properly set up:
 
 .. code-block:: text
+
     go get -d github.com/Mierdin/todd
 
-At this point, you may get an error along the lines of "no buildable GO source files in...". Ignore this error, you should still be able to install ToDD.
+At this point, you may get an error along the lines of "no buildable GO source files in...". Ignore this error; you should still be able to install ToDD.
 
 Navigate to the directory where Go would have downloaded ToDD. As an example:
 
 .. code-block:: text
+
     cd $GOPATH/src/github.com/Mierdin/todd
 
 Finally, compile and install the binaries:
 
 .. code-block:: text
+
     make
     sudo make install
 
@@ -32,6 +38,7 @@ Docker
 If you instead wish to run ToDD inside a Docker container, you can pull the current image from Dockerhub:
 
 .. code-block:: text
+
     mierdin@todd-1:~$ docker pull mierdin/todd
     mierdin@todd-1:~$ docker run --rm mierdin/todd todd -h                        
     NAME:
@@ -43,6 +50,12 @@ If you instead wish to run ToDD inside a Docker container, you can pull the curr
     VERSION:
        v0.1.0
     ......
+
+The binaries below are distributed inside this container and can be run as commands on top of the "docker run" command:
+
+- ``todd`` - the CLI client for ToDD
+- ``todd-server`` - the ToDD server binary
+- ``todd-agent`` - the ToDD agent binary
 
 A Dockerfile for running any ToDD component (server/agent/client) is provided in the repository if you wish to build the image yourself. This Dockerfile is what's used to automatically build the Docker image within Dockerhub.
 
