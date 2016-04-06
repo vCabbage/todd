@@ -61,4 +61,8 @@ A Dockerfile for running any ToDD component (server/agent/client) is provided in
 
 Vagrant
 ----------
-There is also a provided vagrantfile in the repo. This is not something you should use to actually run ToDD in production, but it is handy to get a quick server stood up, alongside all of the other dependencies like a database.
+There is also a provided vagrantfile in the repo. This is not something you should use to actually run ToDD in production, but it is handy to get a quick server stood up, alongside all of the other dependencies like a database. This Vagrantfile is configured to use the provided Ansible playbook for provisioning, so in order to get a nice ToDD-ready virtual machine, one must only run the following from within the ToDD directory:
+
+.. code-block:: text
+
+    vagrant up
