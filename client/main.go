@@ -10,6 +10,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	capi "github.com/Mierdin/todd/api/client"
@@ -71,12 +72,34 @@ func main() {
 			Name:  "create",
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
+
+				fi, err := os.Stdin.Stat()
+				if err != nil {
+					panic(err)
+				}
+
+				var yamlFile string
+				var fromStdin bool
+
+				if fi.Size() > 0 {
+					bytes, err := ioutil.ReadAll(os.Stdin)
+					if err != nil {
+						panic(err)
+					}
+					yamlFile = string(bytes)
+					fromStdin = true
+				} else {
+					yamlFile = c.Args()[0]
+					fromStdin = false
+				}
+
 				clientapi.Create(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
+					yamlFile,
+					fromStdin,
 				)
 			},
 		},

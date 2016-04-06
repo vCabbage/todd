@@ -24,7 +24,19 @@ import (
 
 // Create is responsible for pushing a ToDD object to the server for eventual storage in whatever database is being used
 // It will send a ToddObject rendered as JSON to the "createobject" method of the ToDD API
-func (capi ClientApi) Create(conf map[string]string, objFile string) {
+func (capi ClientApi) Create(conf map[string]string, objFile string, fromStdIn bool) {
+
+	fmt.Println(objFile)
+
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		panic(err)
+	}
+	if fi.Size() > 0 {
+		fmt.Println("there is something to read")
+	} else {
+		fmt.Println("stdin is empty")
+	}
 
 	// If no subarg was provided, do nothing special
 	if objFile == "" {
@@ -32,12 +44,18 @@ func (capi ClientApi) Create(conf map[string]string, objFile string) {
 		os.Exit(1)
 	}
 
-	// Read YAML file
-	filename, _ := filepath.Abs(fmt.Sprintf("./%s", objFile))
-	yamlFile, err := ioutil.ReadFile(filename)
-	if err != nil {
-		fmt.Println("Unable to parse YAML")
-		os.Exit(1)
+	var yamlFile []byte
+
+	if fromStdIn {
+		yamlFile = []byte(objFile)
+	} else {
+		// Read YAML file
+		filename, _ := filepath.Abs(fmt.Sprintf("./%s", objFile))
+		yamlFile, err = ioutil.ReadFile(filename)
+		if err != nil {
+			fmt.Println("Unable to parse YAML")
+			os.Exit(1)
+		}
 	}
 
 	// Unmarshal YAML file into a BaseObject so we can peek into the metadata
