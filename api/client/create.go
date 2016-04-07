@@ -24,34 +24,32 @@ import (
 
 // Create is responsible for pushing a ToDD object to the server for eventual storage in whatever database is being used
 // It will send a ToddObject rendered as JSON to the "createobject" method of the ToDD API
-func (capi ClientApi) Create(conf map[string]string, objFile string, fromStdIn bool) {
+func (capi ClientApi) Create(conf map[string]string, yamlFileName string) {
 
-	fmt.Println(objFile)
-
+	// See if anything is being passed via stdin
 	fi, err := os.Stdin.Stat()
 	if err != nil {
 		panic(err)
 	}
+
+	var yamlDef []byte
+	// If stdin is populated, read from that
 	if fi.Size() > 0 {
-		fmt.Println("there is something to read")
+		yamlDef, err = ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			panic(err)
+		}
 	} else {
-		fmt.Println("stdin is empty")
-	}
 
-	// If no subarg was provided, do nothing special
-	if objFile == "" {
-		fmt.Println("Please provide definition file")
-		os.Exit(1)
-	}
+		// Quit if there's nothing on stdin, and there's no arg either
+		if yamlFileName == "" {
+			fmt.Println("Please provide definition file")
+			os.Exit(1)
+		}
 
-	var yamlFile []byte
-
-	if fromStdIn {
-		yamlFile = []byte(objFile)
-	} else {
 		// Read YAML file
-		filename, _ := filepath.Abs(fmt.Sprintf("./%s", objFile))
-		yamlFile, err = ioutil.ReadFile(filename)
+		filename, _ := filepath.Abs(fmt.Sprintf("./%s", yamlFileName))
+		yamlDef, err = ioutil.ReadFile(filename)
 		if err != nil {
 			fmt.Println("Unable to parse YAML")
 			os.Exit(1)
@@ -60,7 +58,7 @@ func (capi ClientApi) Create(conf map[string]string, objFile string, fromStdIn b
 
 	// Unmarshal YAML file into a BaseObject so we can peek into the metadata
 	var baseobj objects.BaseObject
-	err = yaml.Unmarshal(yamlFile, &baseobj)
+	err = yaml.Unmarshal(yamlDef, &baseobj)
 	if err != nil {
 		panic(err)
 	}
@@ -72,14 +70,14 @@ func (capi ClientApi) Create(conf map[string]string, objFile string, fromStdIn b
 	switch baseobj.Type {
 	case "group":
 		var group_obj objects.GroupObject
-		err = yaml.Unmarshal(yamlFile, &group_obj)
+		err = yaml.Unmarshal(yamlDef, &group_obj)
 		if err != nil {
 			panic(err)
 		}
 		finalobj = group_obj
 	case "testrun":
 		var testrun_obj objects.TestRunObject
-		err = yaml.Unmarshal(yamlFile, &testrun_obj)
+		err = yaml.Unmarshal(yamlDef, &testrun_obj)
 		if err != nil {
 			panic(err)
 		}
