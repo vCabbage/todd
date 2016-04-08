@@ -1,0 +1,13 @@
+---
+type: testrun
+label: inttest-iperf
+spec:
+    targettype: group
+    source:
+        name: red
+        app: iperf
+        args: "-c {{ target }}"
+    target:
+        name: blue
+        app: iperf
+        args: "-s"

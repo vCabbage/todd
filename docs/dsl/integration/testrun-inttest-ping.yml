@@ -1,0 +1,12 @@
+---
+type: testrun
+label: inttest-ping
+spec:
+    targettype: uncontrolled
+    source:
+        name: red
+        app: ping
+        args: "-c 3"
+    target:
+    - 4.2.2.2
+    - 8.8.8.8
