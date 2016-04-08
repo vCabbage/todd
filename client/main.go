@@ -71,12 +71,13 @@ func main() {
 			Name:  "create",
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
+
 				clientapi.Create(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
+					c.Args().First(),
 				)
 			},
 		},

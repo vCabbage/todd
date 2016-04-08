@@ -1,0 +1,7 @@
+---
+type: group
+label: blue
+spec:
+    group: blue
+    matches:
+    - hostname: "todd-agent-[3-5]"

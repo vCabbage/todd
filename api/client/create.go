@@ -15,7 +15,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 
@@ -24,25 +23,17 @@ import (
 
 // Create is responsible for pushing a ToDD object to the server for eventual storage in whatever database is being used
 // It will send a ToddObject rendered as JSON to the "createobject" method of the ToDD API
-func (capi ClientApi) Create(conf map[string]string, objFile string) {
+func (capi ClientApi) Create(conf map[string]string, yamlFileName string) {
 
-	// If no subarg was provided, do nothing special
-	if objFile == "" {
-		fmt.Println("Please provide definition file")
-		os.Exit(1)
-	}
-
-	// Read YAML file
-	filename, _ := filepath.Abs(fmt.Sprintf("./%s", objFile))
-	yamlFile, err := ioutil.ReadFile(filename)
+	// Pull YAML from either stdin or from the filename if stdin is empty
+	yamlDef, err := getYAMLDef(yamlFileName)
 	if err != nil {
-		fmt.Println("Unable to parse YAML")
-		os.Exit(1)
+		panic(err)
 	}
 
 	// Unmarshal YAML file into a BaseObject so we can peek into the metadata
 	var baseobj objects.BaseObject
-	err = yaml.Unmarshal(yamlFile, &baseobj)
+	err = yaml.Unmarshal(yamlDef, &baseobj)
 	if err != nil {
 		panic(err)
 	}
@@ -54,14 +45,14 @@ func (capi ClientApi) Create(conf map[string]string, objFile string) {
 	switch baseobj.Type {
 	case "group":
 		var group_obj objects.GroupObject
-		err = yaml.Unmarshal(yamlFile, &group_obj)
+		err = yaml.Unmarshal(yamlDef, &group_obj)
 		if err != nil {
 			panic(err)
 		}
 		finalobj = group_obj
 	case "testrun":
 		var testrun_obj objects.TestRunObject
-		err = yaml.Unmarshal(yamlFile, &testrun_obj)
+		err = yaml.Unmarshal(yamlDef, &testrun_obj)
 		if err != nil {
 			panic(err)
 		}
@@ -121,4 +112,21 @@ func (capi ClientApi) Create(conf map[string]string, objFile string) {
 		os.Exit(1)
 	}
 
+}
+
+// getYAMLDef reads YAML from either stdin or from the filename if stdin is empty
+func getYAMLDef(yamlFileName string) ([]byte, error) {
+	// If stdin is populated, read from that
+	if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
+		return ioutil.ReadAll(os.Stdin)
+	}
+
+	// Quit if there's nothing on stdin, and there's no arg either
+	if yamlFileName == "" {
+		fmt.Println("Please provide definition file")
+		os.Exit(1)
+	}
+
+	// Read YAML file
+	return ioutil.ReadFile(yamlFileName)
 }
