@@ -18,7 +18,7 @@ RUN apt-get update \
 # Install ToDD
 COPY . /go/src/github.com/Mierdin/todd
 
-RUN cd /go/src/github.com/Mierdin/todd && make install
+RUN cd /go/src/github.com/Mierdin/todd && make && make install
 
 RUN cp /go/src/github.com/Mierdin/todd/etc/server.cfg /etc/todd
 RUN cp /go/src/github.com/Mierdin/todd/etc/agent.cfg /etc/todd
