@@ -15,7 +15,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 
@@ -26,34 +25,10 @@ import (
 // It will send a ToddObject rendered as JSON to the "createobject" method of the ToDD API
 func (capi ClientApi) Create(conf map[string]string, yamlFileName string) {
 
-	// See if anything is being passed via stdin
-	fi, err := os.Stdin.Stat()
+	// Pull YAML from either stdin or from the filename if stdin is empty
+	yamlDef, err := getYAMLDef(yamlFileName)
 	if err != nil {
 		panic(err)
-	}
-
-	var yamlDef []byte
-	// If stdin is populated, read from that
-	if fi.Size() > 0 {
-		yamlDef, err = ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-
-		// Quit if there's nothing on stdin, and there's no arg either
-		if yamlFileName == "" {
-			fmt.Println("Please provide definition file")
-			os.Exit(1)
-		}
-
-		// Read YAML file
-		filename, _ := filepath.Abs(fmt.Sprintf("./%s", yamlFileName))
-		yamlDef, err = ioutil.ReadFile(filename)
-		if err != nil {
-			fmt.Println("Unable to parse YAML")
-			os.Exit(1)
-		}
 	}
 
 	// Unmarshal YAML file into a BaseObject so we can peek into the metadata
@@ -137,4 +112,21 @@ func (capi ClientApi) Create(conf map[string]string, yamlFileName string) {
 		os.Exit(1)
 	}
 
+}
+
+// getYAMLDef reads YAML from either stdin or from the filename if stdin is empty
+func getYAMLDef(yamlFileName string) ([]byte, error) {
+	// If stdin is populated, read from that
+	if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
+		return ioutil.ReadAll(os.Stdin)
+	}
+
+	// Quit if there's nothing on stdin, and there's no arg either
+	if yamlFileName == "" {
+		fmt.Println("Please provide definition file")
+		os.Exit(1)
+	}
+
+	// Read YAML file
+	return ioutil.ReadFile(yamlFileName)
 }

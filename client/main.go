@@ -72,18 +72,12 @@ func main() {
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
 
-				yamlFileName := ""
-				// If a filename is passed, use that. Otherwise, pass an empty string
-				if len(c.Args()) >= 1 {
-					yamlFileName = c.Args()[0]
-				}
-
 				clientapi.Create(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
-					yamlFileName,
+					c.Args().First(),
 				)
 			},
 		},
