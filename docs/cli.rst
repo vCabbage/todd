@@ -38,6 +38,7 @@ Agents
 Use the ``todd agents`` command to display information about the agents currently known to the ToDD server.
 
 .. code-block:: text
+
     mierdin@todd-1:~$ todd agents --help
     NAME:
        temp-client agents - Show ToDD agent information
@@ -47,16 +48,51 @@ Use the ``todd agents`` command to display information about the agents currentl
 
 You can run this command on it's own to display a summary of all agents, their facts, collectors, etc:
 
-  < example >
+.. code-block:: text
+
+    mierdin@todd-1:~$ todd agents
+    UUID          EXPIRES ADDR        FACT SUMMARY        COLLECTOR SUMMARY
+    4c1ef1fd94ce  23s     172.18.0.7  Addresses, Hostname get_addresses, get_hostname
+    cba4e720efae  24s     172.18.0.8  Addresses, Hostname get_addresses, get_hostname
+    555dacccb4ae  24s     172.18.0.9  Addresses, Hostname get_addresses, get_hostname
+    79ffae90354e  24s     172.18.0.10 Hostname, Addresses get_addresses, get_hostname
+    42b1341c22fe  24s     172.18.0.11 Addresses, Hostname get_addresses, get_hostname
+    fdb4c3ddc8eb  25s     172.18.0.12 Addresses, Hostname get_hostname, get_addresses
 
 Or, you could append an agent UUID to this command to see detailed information about that agent, such as the facts that it is reporting:
 
-  < example >
+.. code-block:: text
+
+    mierdin@todd-1:~$ todd agents 4c1ef1fd94ce 
+    Agent UUID:  4c1ef1fd94ce91c9c589880c47fb5374bba91ecdeb852a9ac3bb4278507c0ba4
+    Expires:  25s
+    Collector Summary: get_addresses, get_hostname
+    Facts:
+    {
+        "Addresses": [
+            "127.0.0.1",
+            "::1",
+            "172.18.0.7",
+            "fe80::42:acff:fe12:7"
+        ],
+        "Hostname": [
+            "todd-agent-0"
+        ]
+    }
 
 Create
 ----------
 
-Run "todd create"
+Use the ``todd create`` command to upload an object to the ToDD server.
+
+.. code-block:: text
+
+    mierdin@todd-1:~$ todd agents --help
+    NAME:
+       temp-client agents - Show ToDD agent information
+
+    USAGE:
+       temp-client agents [arguments...]
 
 Delete
 ----------
@@ -79,3 +115,4 @@ Run
 Run "todd create"
 
 Show optional arguments
+
