@@ -9,7 +9,10 @@ ToDD Documentation
 .. toctree::
    :maxdepth: 2
 
+   design.rst
    install.rst
+   installrpi.rst
+   configure.rst
    cli.rst
    objects.rst
    testlets.rst
@@ -22,3 +25,4 @@ In the meantime, check out my `blog post on ToDD <http://keepingitclassless.net/
 The mailing list for ToDD is available here: `https://groups.google.com/forum/#!forum/todd-dev <https://groups.google.com/forum/#!forum/todd-dev>`_
 
 TODO: Put in high level design and make sure to mention dependencies like rabbitmq, etcd, etc. (in that they're not hard dependencies but currently they are the only implementations)
+
