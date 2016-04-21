@@ -3,8 +3,7 @@ Installing on Raspberry Pi
 
 .. image:: images/rpi.jpeg
 
-.. topic:: NOTE
-
+.. IMPORTANT::
    These instructions were tested on several Raspberry Pi 3 (Model B). In theory, these instructions should work for other models, but may require some minor modifications.
 
 Housekeeping
@@ -69,3 +68,41 @@ Next, use make to compile ToDD. Be patient, the first step can take a while on t
     sudo make install
 
 
+Run ToDD Agent
+--------------
+
+It's likely that you'll want to run the ToDD agent as a service. Use this systemd unit file as a starting example:
+
+.. code-block:: text
+
+    pi@todd-pi-01:~ $ cat /etc/systemd/system/todd-agent.service
+    [Unit]
+    Description=ToDD Agent
+
+    [Service]
+    ExecStart=/usr/bin/todd-agent
+
+Next, start the service, and check the status to ensure it's running without issues. You should see something like this:
+
+.. code-block:: text
+
+    pi@todd-pi-01:~ $ sudo systemctl start todd-agent.service
+
+    pi@todd-pi-01:~ $ sudo systemctl status todd-agent
+     todd-agent.service - ToDD Agent
+       Loaded: loaded (/etc/systemd/system/todd-agent.service; static)
+       Active: active (running) since Thu 2016-04-21 08:13:58 UTC; 33min ago
+     Main PID: 8532 (todd-agent)
+       CGroup: /system.slice/todd-agent.service
+               └─8532 /usr/bin/todd-agent
+
+    Apr 21 08:47:16 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:16Z" level=info msg="AGENTADV -- 2016-04-21 08:47:16.577100389 +0000 UTC"
+    Apr 21 08:47:16 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:16Z" level=debug msg="Retrieving value of key - unackedGroup"
+    Apr 21 08:47:18 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:18Z" level=debug msg="Retrieving value of key - unackedGroup"
+    Apr 21 08:47:20 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:20Z" level=debug msg="Retrieving value of key - unackedGroup"
+    Apr 21 08:47:21 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:21Z" level=debug msg="Agent task received: {\"type\":\"SetGroup\",\"groupName\":\"rpi\"}"
+    Apr 21 08:47:21 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:21Z" level=debug msg="Retrieving value of key - group"
+    Apr 21 08:47:21 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:21Z" level=info msg="Already in the group being dictated by the server: rpi"
+    Apr 21 08:47:22 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:22Z" level=debug msg="Retrieving value of key - unackedGroup"
+    Apr 21 08:47:24 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:24Z" level=debug msg="Retrieving value of key - unackedGroup"
+    Apr 21 08:47:26 todd-pi-02 todd-agent[8532]: time="2016-04-21T08:47:26Z" level=debug msg="Retrieving value of key - unackedGroup"
