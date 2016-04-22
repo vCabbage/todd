@@ -2,15 +2,12 @@
 # source code is governed by the license provided here:
 # https://github.com/Mierdin/todd/blob/master/LICENSE
 
-
-# REMOVE all mentions of ":integration-testing"
-
 # This script is designed to manage containers for ToDD. This could be start the basic infrastructure for ToDD like the etcd and rabbitmq containers,
 # or you could run with the "integration" arg, and run integration tests as well.
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-alias dtodd='docker run --rm --net todd-network --name="todd-client" mierdin/todd:integration-testing todd --host="todd-server.todd-network"'
+alias dtodd='docker run --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network"'
 
 # Clean up old containers
 function cleanup {
@@ -57,12 +54,12 @@ function startinfra {
 }
 
 function starttodd {
-    docker run -d -h="todd-server" --net todd-network --name="todd-server" mierdin/todd:integration-testing todd-server --config="/etc/todd/server-int.cfg"
+    docker run -d -h="todd-server" --net todd-network --name="todd-server" mierdin/todd todd-server --config="/etc/todd/server-int.cfg"
 
     i="0"
     while [ $i -lt 6 ]
     do
-        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd:integration-testing todd-agent --config="/etc/todd/agent-int.cfg"
+        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd todd-agent --config="/etc/todd/agent-int.cfg"
         i=$[$i+1]
     done
 
@@ -71,12 +68,12 @@ function starttodd {
 function itsetup {
 
     # Upload grouping files
-    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:integration-testing todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:integration-testing todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
 
     # Upload testrun files
-    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:integration-testing todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:integration-testing todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
     
 }
 
@@ -103,7 +100,7 @@ function runintegrationtests {
 docker-machine start docker-dev
 eval $(docker-machine env docker-dev)
 
-docker pull mierdin/todd:integration-testing
+docker pull mierdin/todd
 
 export HostIP=$(docker-machine ip docker-dev)
 # Set HostIP to localhost if docker-machine doesn't run
