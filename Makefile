@@ -25,8 +25,7 @@ fmt:
 
 configureenv:
 	mkdir -p /etc/todd
-	cp -f etc/agent.cfg /etc/todd/agent.cfg
-	cp -r etc/server.cfg /etc/todd/server.cfg
+	cp -f etc/* /etc/todd/
 	mkdir -p /opt/todd/agent/assets/factcollectors
 	mkdir -p /opt/todd/server/assets/factcollectors
 	mkdir -p /opt/todd/agent/assets/testlets
