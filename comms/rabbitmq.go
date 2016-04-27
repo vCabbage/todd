@@ -568,6 +568,8 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
 	log.Infof(" [*] Waiting for messages. To exit press CTRL+C")
 	<-forever
+
+	return nil
 }
 
 // WatchForGroup should be run as a goroutine, like other background services. This is because it will itself spawn a goroutine to
@@ -594,7 +596,7 @@ rereg:
 
 	go func() {
 		for {
-			rmq.ListenForGroupTasks(group, dereg)
+			err := rmq.ListenForGroupTasks(group, dereg)
 			if err != nil {
 				log.Warn("ListenForGroupTasks reported a failure. Trying again...")
 			}
@@ -705,6 +707,8 @@ func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) 
 	// This will block until something is sent into this channel. This is an indication that we wish to stop listening for
 	// new group tasks, ususally because we need to re-register onto a new queue
 	<-dereg
+
+	return nil
 }
 
 // SendResponse will send a response object onto the statically-defined queue for receiving such messages.

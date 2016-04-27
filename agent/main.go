@@ -70,7 +70,7 @@ func main() {
 	// Spawn goroutine to listen for tasks issued by server
 	go func() {
 		for {
-			tc.CommsPackage.ListenForTasks(uuid)
+			err := tc.CommsPackage.ListenForTasks(uuid)
 			if err != nil {
 				log.Warn("ListenForTasks reported a failure. Trying again...")
 			}
