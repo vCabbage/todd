@@ -124,3 +124,13 @@ then
 
     runintegrationtests
 fi
+
+if [ "$1" == "interop" ]
+then
+    i="0"
+    while [ $i -lt 3 ]
+    do
+        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd todd-agent --config="/etc/todd/agent-interop.cfg"
+        i=$[$i+1]
+    done
+fi
