@@ -20,7 +20,4 @@ COPY . /go/src/github.com/Mierdin/todd
 
 RUN cd /go/src/github.com/Mierdin/todd && make && make install
 
-RUN cp /go/src/github.com/Mierdin/todd/etc/server.cfg /etc/todd
-RUN cp /go/src/github.com/Mierdin/todd/etc/agent.cfg /etc/todd
-RUN cp /go/src/github.com/Mierdin/todd/etc/server-int.cfg /etc/todd
-RUN cp /go/src/github.com/Mierdin/todd/etc/agent-int.cfg /etc/todd
+RUN cp /go/src/github.com/Mierdin/todd/etc/* /etc/todd
