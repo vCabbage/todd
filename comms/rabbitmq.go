@@ -61,7 +61,7 @@ func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 		}
 
 		retries++
-		log.Warnf("Failure connecting to RabbitMQ - retry #%s", retries)
+		log.Warnf("Failure connecting to RabbitMQ - retry #%s", string(retries))
 		time.Sleep(1 * time.Second)
 	}
 	defer conn.Close()
@@ -391,7 +391,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 		}
 
 		retries++
-		log.Warnf("Failure connecting to RabbitMQ - retry #%s", retries)
+		log.Warnf("Failure connecting to RabbitMQ - retry #%s", string(retries))
 		time.Sleep(1 * time.Second)
 	}
 	defer conn.Close()
@@ -642,7 +642,7 @@ func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) 
 		}
 
 		retries++
-		log.Warnf("Failure connecting to RabbitMQ - retry #%s", retries)
+		log.Warnf("Failure connecting to RabbitMQ - retry #%s", string(retries))
 		time.Sleep(1 * time.Second)
 	}
 	defer conn.Close()
