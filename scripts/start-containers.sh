@@ -1,13 +1,15 @@
 # Copyright 2016 Matt Oswalt. Use or modification of this
 # source code is governed by the license provided here:
-# https://github.com/Mierdin/todd/blob/master/LICENSE
+# https://github.com/mierdin/todd:$branch/blob/master/LICENSE
 
 # This script is designed to manage containers for ToDD. This could be start the basic infrastructure for ToDD like the etcd and rabbitmq containers,
 # or you could run with the "integration" arg, and run integration tests as well.
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-alias dtodd='docker run --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network"'
+branch="latest"
+
+alias dtodd='docker run --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network"'
 
 # Clean up old containers
 function cleanup {
@@ -53,13 +55,16 @@ function startinfra {
 
 }
 
+# arg $1: number of agents to use
+# arg $2: server config location
+# arg $3: agent config location
 function starttodd {
-    docker run -d -h="todd-server" --net todd-network --name="todd-server" mierdin/todd todd-server --config="/etc/todd/server-int.cfg"
+    docker run -d -h="todd-server" -p 8081:8081 -p 8080:8080 -p 8090:8090 --net todd-network --name="todd-server" mierdin/todd:$branch todd-server --config="$2"
 
     i="0"
-    while [ $i -lt 6 ]
+    while [ $i -lt $1 ]
     do
-        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd todd-agent --config="/etc/todd/agent-int.cfg"
+        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd:$branch todd-agent --config="$3"
         i=$[$i+1]
     done
 
@@ -68,12 +73,12 @@ function starttodd {
 function itsetup {
 
     # Upload grouping files
-    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
 
     # Upload testrun files
-    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
     
 }
 
@@ -100,7 +105,7 @@ function runintegrationtests {
 docker-machine start docker-dev
 eval $(docker-machine env docker-dev)
 
-docker pull mierdin/todd
+docker pull mierdin/todd:$branch
 
 export HostIP=$(docker-machine ip docker-dev)
 # Set HostIP to localhost if docker-machine doesn't run
@@ -118,7 +123,7 @@ if [ "$1" == "integration" ]
 then
     sleep 5
 
-    starttodd
+    starttodd 6 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
 
     itsetup
 
@@ -127,10 +132,10 @@ fi
 
 if [ "$1" == "interop" ]
 then
-    i="0"
-    while [ $i -lt 3 ]
-    do
-        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd todd-agent --config="/etc/todd/agent-interop.cfg"
-        i=$[$i+1]
-    done
+    sleep 5
+
+    starttodd 3 /etc/todd/server-interop.cfg /etc/todd/agent-interop.cfg
+
+    sleep 2
+
 fi
