@@ -1,7 +1,7 @@
 ---
 # Example test file
 type: testrun
-label: test-http-saas
+label: test-http
 spec:
     targettype: uncontrolled
     source:
