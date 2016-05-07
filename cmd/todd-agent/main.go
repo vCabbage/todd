@@ -51,6 +51,11 @@ func main() {
 
 	cfg := config.GetConfig(arg_config)
 
+	// Create optDir
+	if err := os.MkdirAll(cfg.LocalResources.OptDir, 0755); err != nil {
+		log.Fatalln("Unable to create optDir:", err)
+	}
+
 	// Set up cache
 	var ac = cache.NewAgentCache(cfg)
 	ac.Init()
