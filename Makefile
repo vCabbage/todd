@@ -16,9 +16,9 @@ compile: install_deps clean
 	mkdir -p build/
 	mkdir -p assets/
 	$(GOPATH)/bin/go-bindata -o assets/assets_unpack.go -pkg="assets" agent/...
-	cd server && $(GOPATH)/bin/godep go build -o ../build/todd-server
-	cd client && $(GOPATH)/bin/godep go build -o ../build/todd
-	cd agent && $(GOPATH)/bin/godep go build -o ../build/todd-agent
+	cd server go build -o ../build/todd-server
+	cd client go build -o ../build/todd
+	cd agent go build -o ../build/todd-agent
 
 fmt:
 	go fmt github.com/mierdin/todd/...
@@ -39,11 +39,11 @@ install: configureenv
 	rm -rf build/
 
 test: 
-	godep go test ./... -cover
+	go test ./... -cover
 
 install_deps:
-	go get github.com/tools/godep
 	go get -u github.com/jteeuwen/go-bindata/...
 
 update_deps:
+	go get -u github.com/tools/godep
 	godep save ./...
