@@ -1,82 +1,106 @@
 ---
 - name: Sudo-level VM Prep
   hosts: all
-  sudo: yes
+  become: true
   vars:
-    todd_dir: /home/vagrant/go/src/github.com/Mierdin/todd
+    docker_repo: 'deb https://apt.dockerproject.org/repo {{ ansible_distribution|lower }}-{{ ansible_distribution_release|lower }} main'
+    todd_dir: '/home/vagrant/go/src/github.com/Mierdin/todd'
     gover: 1.5.2  #Change this variable to update to a new version of Go
   tasks:
 
-  - name: Set up docker repo
-    apt_repository:
-      repo='deb https://apt.dockerproject.org/repo ubuntu-trusty main'
-      state=present
+    - name: Set up docker repo
+      apt_repository:
+        repo:'{{ docker_repo }}'
+        state: present
 
-  - name: Install APT dependencies
-    apt: pkg={{ item }} state=latest update_cache=yes force=yes  # Currently forcing because of a certificate error for docker-engine
-    with_items:
-    - git
-    - docker-engine
+    - name: Install APT dependencies
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: yes
+        force: yes  # Currently forcing because of a certificate error for docker-engine
+      with_items:
+      - git
+      - docker-engine
 
-  - name: Add vagrant user to docker group
-    user: name=vagrant groups="docker" append=yes
+    - name: Add vagrant user to docker group
+      user:
+        name: "vagrant"
+        groups: "docker"
+        append: yes
 
-  - name: Ensure docker service is restarted
-    service: name=docker state=restarted
+    - name: Ensure docker service is restarted
+      service:
+        name: "docker"
+        state: restarted
 
-  - name: Download Go tarball
-    get_url:
-      url="https://storage.googleapis.com/golang/go{{ gover }}.linux-amd64.tar.gz"
-      validate_certs=no
-      dest=/tmp/go{{ gover }}.linux-amd64.tar.gz
-      mode=0770
+    - name: Download Go tarball
+      get_url:
+        url: "https://storage.googleapis.com/golang/go{{ gover }}.linux-amd64.tar.gz"
+        validate_certs: no
+        dest: "/tmp/go{{ gover }}.linux-amd64.tar.gz"
+        mode: 0770
 
-  - name: Unzip Go tarball
-    unarchive:
-      src=/tmp/go{{ gover }}.linux-amd64.tar.gz
-      dest=/usr/local
-      copy=no
+    - name: Unzip Go tarball
+      unarchive:
+        src: "/tmp/go{{ gover }}.linux-amd64.tar.gz"
+        dest: /usr/local
+        copy: no
 
-  - name: Set PATH
-    lineinfile: 
-      dest=/etc/environment
-      state=present
-      regexp='^PATH'
-      line='PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/go/bin:/home/vagrant/go/bin'
+    - name: Set PATH
+      lineinfile:
+        dest: "/etc/environment"
+        state: present
+        regexp: "^PATH"
+        line: "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/go/bin:/home/vagrant/go/bin"
 
-  - name: Set GOPATH
-    lineinfile: 
-      dest=/etc/environment
-      state=present
-      regexp='^GOPATH'
-      line='GOPATH=/home/vagrant/go'
+    - name: Set GOPATH
+      lineinfile:
+        dest: "/etc/environment"
+        state: present
+        regexp: "^GOPATH"
+        line: "GOPATH=/home/vagrant/go"
 
-  - name: Set path for sudoers
-    lineinfile: dest=/etc/sudoers line='Defaults  secure_path="/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
+    - name: Set path for sudoers
+      lineinfile:
+        dest: "/etc/sudoers"
+        line: "Defaults  secure_path=\"/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\""
 
-  - name: Create ToDD directory
-    file: path={{ todd_dir }} state=directory mode=0755 owner=vagrant group=vagrant
+    - name: Create ToDD directory
+      file:
+        path: "{{ todd_dir }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: 0755
 
-     # // TODO need to remove this dir first?
-  - name: Copy ToDD into VM
-    shell: cp -r /vagrant/* {{ todd_dir }}
+       # // TODO need to remove this dir first?
+    - name: Copy ToDD into VM
+      copy:
+        src: "/vagrant/"
+        dest: "{{ todd_dir }}"
 
-  - name: Set dir perms
-    shell: chown -R vagrant:vagrant {{ todd_dir }} && chmod -R 777 {{ todd_dir }}
-
+    - name: Set dir perms
+      file:
+        src: "{{ todd_dir }}"
+        state: directory
+        recurse: yes
+        owner: "vagrant"
+        group: "vagrant"
+        mode: 0777
 
 - name: Prepping for ToDD
   hosts: all
   vars:
-    todd_dir: /home/vagrant/go/src/github.com/Mierdin/todd
+    todd_dir: '/home/vagrant/go/src/github.com/Mierdin/todd'
   tasks:
 
-  - name: Set GOPATH for Vagrant user profile
-    lineinfile: 
-      dest=/home/vagrant/.profile
-      state=present
-      regexp='^GOPATH'
-      line='GOPATH=/home/vagrant/go'
+    - name: Set GOPATH for Vagrant user profile
+      lineinfile:
+        dest: "/home/vagrant/.profile"
+        state: present
+        regexp: "^GOPATH"
+        line: "GOPATH=/home/vagrant/go"
 
   # - name: Start etcd and rabbitmq containers
   #   shell: cd {{ todd_dir }}/scripts && ./start-containers.sh
