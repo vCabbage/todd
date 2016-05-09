@@ -1,6 +1,6 @@
 #SHELL := /bin/bash
 
-all: install_deps install
+all: install
 
 clean:
 	rm -f $(GOPATH)/bin/todd-server
@@ -17,16 +17,14 @@ fmt:
 	go fmt github.com/mierdin/todd/...
 
 test: 
-	godep go test ./... -cover
+	go test ./... -cover
 
-install_deps:
-	go get github.com/tools/godep
-	go get -u github.com/jteeuwen/go-bindata/...
-
-update_deps: install_deps
+update_deps:
+	go get -u github.com/tools/godep
 	godep save ./...
 
-update_assets: install_deps
+update_assets:
+	go get -u github.com/jteeuwen/go-bindata/...
 	$(GOPATH)/bin/go-bindata -o assets/assets_unpack.go -pkg="assets" -prefix="agent" agent/testing/testlets/... agent/facts/collectors/...
 
 start: install
