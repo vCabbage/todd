@@ -12,7 +12,7 @@
 
     - name: Set up docker repo
       apt_repository:
-        repo:'{{ docker_repo }}'
+        repo: '{{ docker_repo }}'
         state: "present"
 
     - name: Install APT dependencies
