@@ -94,7 +94,7 @@
   vars:
     todd_dir: '/home/vagrant/go/src/github.com/Mierdin/todd'
   tasks:
-
+    
     - name: Set GOPATH for Vagrant user profile
       lineinfile:
         dest: "/home/vagrant/.profile"
@@ -106,5 +106,5 @@
   #   shell: cd {{ todd_dir }}/scripts && ./start-containers.sh
   #   sudo: yes
 
-  - name: Print follow-up instructions
-    debug: msg="READY TO INSTALL TODD. PLEASE RUN 'sudo make install' IN {{ todd_dir }}"
+    - name: Print follow-up instructions
+      debug: msg="READY TO INSTALL TODD. PLEASE RUN 'sudo make install' IN {{ todd_dir }}"
