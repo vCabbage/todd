@@ -64,10 +64,10 @@ func connectRabbitMQ(queueUrl string) (*amqp.Connection, error) {
 func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 
 	queueUrl := fmt.Sprintf("amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	// Connect to RabbitMQ with retry logic
@@ -160,10 +160,10 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 
 	queue_url := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	conn, err := amqp.Dial(queue_url)
@@ -300,10 +300,10 @@ func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) {
 
 	queue_url := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	conn, err := amqp.Dial(queue_url)
@@ -388,10 +388,10 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
 	queueUrl := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	// Connect to RabbitMQ with retry logic
@@ -633,10 +633,10 @@ func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) 
 
 	queueUrl := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	// Connect to RabbitMQ with retry logic
@@ -716,10 +716,10 @@ func (rmq rabbitMQComms) SendResponse(resp responses.Response) {
 
 	queue_url := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	queueName := "agentresponses"
@@ -806,10 +806,10 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 
 	queue_url := fmt.Sprintf(
 		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
 	)
 
 	queueName := "agentresponses"
