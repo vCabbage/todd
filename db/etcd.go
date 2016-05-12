@@ -27,7 +27,7 @@ import (
 // newEtcdDB is a factory function that produces a new instance of etcdDB with the configuration
 // loaded and ready to be used.
 func newEtcdDB(cfg config.Config) *etcdDB {
-	etcdLoc := fmt.Sprintf("http://%s:%s", cfg.DB.IP, cfg.DB.Port)
+	etcdLoc := fmt.Sprintf("http://%s:%s", cfg.DB.Host, cfg.DB.Port)
 	etcdCfg := client.Config{
 		Endpoints: []string{etcdLoc},
 		Transport: client.DefaultTransport,

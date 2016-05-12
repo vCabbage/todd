@@ -34,12 +34,12 @@ type influxDB struct {
 func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData map[string]map[string]map[string]string) {
 	// Make client
 	c, _ := influx.NewHTTPClient(influx.HTTPConfig{
-		Addr: fmt.Sprintf("http://%s:%s", ifdb.config.TSDB.IP, ifdb.config.TSDB.Port),
+		Addr: fmt.Sprintf("http://%s:%s", ifdb.config.TSDB.Host, ifdb.config.TSDB.Port),
 	})
 
 	// Create a new point batch
 	bp, _ := influx.NewBatchPoints(influx.BatchPointsConfig{
-		Database:  "todd_metrics",
+		Database:  ifdb.config.TSDB.DatabaseName,
 		Precision: "s",
 	})
 

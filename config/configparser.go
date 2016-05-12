@@ -13,13 +13,6 @@ import (
 	"gopkg.in/gcfg.v1"
 )
 
-type AMQP struct {
-	User     string
-	Password string
-	Host     string
-	Port     string
-}
-
 type API struct {
 	Host string
 	Port string
@@ -31,19 +24,25 @@ type Assets struct {
 }
 
 type Comms struct {
-	Plugin string
+	Plugin   string
+	User     string
+	Password string
+	Host     string
+	Port     string
 }
 
 type DB struct {
-	IP     string
-	Port   string
-	Plugin string
+	Host         string
+	Port         string
+	Plugin       string
+	DatabaseName string
 }
 
 type TSDB struct {
-	IP     string
-	Port   string
-	Plugin string
+	Host         string
+	Port         string
+	Plugin       string
+	DatabaseName string
 }
 
 type Testing struct {
@@ -61,7 +60,6 @@ type LocalResources struct {
 }
 
 type Config struct {
-	AMQP           AMQP
 	API            API
 	Assets         Assets
 	Comms          Comms
