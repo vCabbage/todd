@@ -19,9 +19,9 @@ compile: install_deps clean
 	cd server && go build -o ../build/todd-server
 	cd client && go build -o ../build/todd
 	cd agent && go build -o ../build/todd-agent
-	test -s ../build/todd-server || { echo "todd-server does not exist! Exiting..."; exit 1; }
-	test -s ../build/todd-agent || { echo "todd-agent does not exist! Exiting..."; exit 1; }
-	test -s ../build/todd || { echo "todd does not exist! Exiting..."; exit 1; }
+	test -s build/todd-server || { echo "todd-server does not exist! Exiting..."; exit 1; }
+	test -s build/todd-agent || { echo "todd-agent does not exist! Exiting..."; exit 1; }
+	test -s build/todd || { echo "todd does not exist! Exiting..."; exit 1; }
 
 fmt:
 	go fmt github.com/mierdin/todd/...
