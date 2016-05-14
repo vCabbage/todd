@@ -10,8 +10,9 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 branch="latest"
+toddimage=mierdin/todd:$branch
 
-alias dtodd='docker run --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network"'
+alias dtodd='docker run --rm --net todd-network --name="todd-client" $image todd --host="todd-server.todd-network"'
 
 # Clean up old containers
 function cleanup {
@@ -77,13 +78,13 @@ function startinfra {
 # arg $3: agent config location
 function starttodd {
     echo "Starting todd-server"
-    docker run -d -h="todd-server" -p 8081:8081 -p 8080:8080 -p 8090:8090 --net todd-network --name="todd-server" mierdin/todd:$branch todd-server --config="$2" > /dev/null
+    docker run -d -h="todd-server" -p 8081:8081 -p 8080:8080 -p 8090:8090 --net todd-network --name="todd-server" $toddimage todd-server --config="$2" > /dev/null
 
     i="0"
     while [ $i -lt $1 ]
     do
         echo "Starting todd-agent-${i}"
-        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" mierdin/todd:$branch todd-agent --config="$3" > /dev/null
+        docker run -d --label toddtype="agent" -h="todd-agent-$i" --net todd-network --name="todd-agent-$i" $toddimage todd-agent --config="$3" > /dev/null
         i=$[$i+1]
     done
 
@@ -92,12 +93,12 @@ function starttodd {
 function itsetup {
 
     # Upload grouping files
-    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
 
     # Upload testrun files
-    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" mierdin/todd:$branch todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
     
 }
 
@@ -134,9 +135,8 @@ then
     fi
 fi
 
-image=mierdin/todd:$branch
-echo "Pulling image ${image}"
-docker pull $image > /dev/null
+echo "Pulling image ${toddimage}"
+docker pull $toddimage > /dev/null
 
 if [ $(docker network ls | grep todd-network | wc -l) -lt 1 ]; then
     echo "Creating todd-network"
