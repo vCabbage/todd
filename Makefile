@@ -10,7 +10,7 @@ clean:
 build:
 	docker build -t mierdin/todd -f Dockerfile .
 
-install:
+install: configureenv
 	go install ./cmd/...
 
 fmt:
@@ -29,3 +29,9 @@ update_assets:
 
 start: install
 	start-containers.sh 3 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
+
+configureenv:
+	mkdir -p /etc/todd
+	chmod -R 777 /opt/todd
+	cp -f etc/{agent,server}.cfg /etc/todd/
+	mkdir -p /opt/todd/{agent,server}/assets/{factcollectors,testlets}

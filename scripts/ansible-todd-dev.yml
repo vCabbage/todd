@@ -46,13 +46,8 @@
       dest=/etc/todd
       state=link
 
-  - name: Create opt dir
-    file:
-      path=/opt/todd
-      state=directory
-      owner=vagrant
-      group=vagrant
-      mode=0755
+  - name: Configure Environment
+    command: cd $todd_dir && make configureenv
 
   - name: GOPATH Owner
     shell: chown vagrant:vagrant $(find /home/vagrant/go | grep -v todd) warn=no
