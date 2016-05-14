@@ -1,6 +1,6 @@
-#SHELL := /bin/bash
+SHELL=/bin/bash
 
-all: install
+all: compile
 
 clean:
 	rm -f $(GOPATH)/bin/todd-server
@@ -10,8 +10,10 @@ clean:
 build:
 	docker build -t mierdin/todd -f Dockerfile .
 
-install: configureenv
+compile:
 	go install ./cmd/...
+
+install: configureenv
 
 fmt:
 	go fmt github.com/mierdin/todd/...
@@ -25,13 +27,13 @@ update_deps:
 
 update_assets:
 	go get -u github.com/jteeuwen/go-bindata/...
-	$(GOPATH)/bin/go-bindata -o assets/assets_unpack.go -pkg="assets" -prefix="agent" agent/testing/testlets/... agent/facts/collectors/...
+	go-bindata -o assets/assets_unpack.go -pkg="assets" -prefix="agent" agent/testing/testlets/... agent/facts/collectors/...
 
-start: install
+start: compile
 	start-containers.sh 3 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
 
 configureenv:
-	mkdir -p /etc/todd
-	chmod -R 777 /opt/todd
-	cp -f etc/{agent,server}.cfg /etc/todd/
+	# Copy configs if etc and /etc/todd aren't linked
+	if ! [ "etc" -ef "/etc/todd" ]; then mkdir -p /etc/todd && cp -f ./etc/{agent,server}.cfg /etc/todd/; fi
 	mkdir -p /opt/todd/{agent,server}/assets/{factcollectors,testlets}
+	chmod -R 777 /opt/todd

@@ -47,7 +47,7 @@
       state=link
 
   - name: Configure Environment
-    command: cd $todd_dir && make configureenv
+    command: make configureenv chdir={{ todd_dir }}
 
   - name: GOPATH Owner
     shell: chown vagrant:vagrant $(find /home/vagrant/go | grep -v todd) warn=no
@@ -79,9 +79,5 @@
       regexp='^cd '
       line='cd {{ todd_dir }}'
 
-  # - name: Start etcd and rabbitmq containers
-  #   shell: cd {{ todd_dir }}/scripts && ./start-containers.sh
-  #   sudo: yes
-
-  - name: Print follow-up instructions
-    debug: msg="READY TO INSTALL TODD. PLEASE RUN 'sudo make install' IN {{ todd_dir }}"
+  - name: Compile ToDD
+    shell: . /home/vagrant/.profile && make chdir={{ todd_dir }}
