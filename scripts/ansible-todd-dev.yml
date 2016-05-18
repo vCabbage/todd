@@ -70,19 +70,19 @@
       file:
         path: "{{ todd_dir }}"
         state: directory
-        owner: vagrant
-        group: vagrant
+        owner: "vagrant"
+        group: "vagrant"
         mode: 0755
 
        # // TODO need to remove this dir first?
     - name: Copy ToDD into VM
       copy:
-        src: "/vagrant/"
+        src: "../../todd/"
         dest: "{{ todd_dir }}"
 
     - name: Set dir perms
       file:
-        src: "{{ todd_dir }}"
+        path: "{{ todd_dir }}"
         state: directory
         recurse: yes
         owner: "vagrant"
@@ -94,7 +94,7 @@
   vars:
     todd_dir: '/home/vagrant/go/src/github.com/Mierdin/todd'
   tasks:
-    
+
     - name: Set GOPATH for Vagrant user profile
       lineinfile:
         dest: "/home/vagrant/.profile"
