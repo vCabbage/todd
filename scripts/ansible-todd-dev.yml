@@ -22,19 +22,21 @@
         update_cache: yes
         force: yes  # Currently forcing because of a certificate error for docker-engine
       with_items:
-      - 'git'
-      - 'docker-engine'
+        - 'git'
+        - 'docker-engine'
 
     - name: Add vagrant user to docker group
       user:
         name: "vagrant"
         groups: "docker"
         append: yes
+      register: vagrant_user_added_to_docker_group
 
     - name: Ensure docker service is restarted
       service:
         name: "docker"
         state: "restarted"
+      when: vagrant_user_added_to_docker_group.changed
 
     - name: Download Go tarball
       get_url:
@@ -49,6 +51,8 @@
         src: "/tmp/go{{ gover }}.linux-amd64.tar.gz"
         dest: "/usr/local"
         copy: no
+      args:
+        creates: "/usr/local/go/bin/go"
 
     - name: Config Files
       file:
@@ -56,14 +60,32 @@
         dest: "/etc/todd"
         state: "link"
 
+    - name: Checking status of Configure Environment
+      stat:
+        path: "{{ todd_dir }}/.make_configureenv_complete"
+      register: "make_configureenv_check"
+
     - name: Configure Environment
-      command: "make configureenv"
+      command: "make configureenv" #what is changed in order to determine if this needs to run again
       args:
         chdir: "{{ todd_dir }}"
+      register: "make_configureenv"
+      when: not make_configureenv_check.stat.exists
 
-    - name: GOPATH Owner
-      shell: "chown vagrant:vagrant $(find /home/vagrant/go | grep -v todd)"
-      warn: no
+    - name: Marking Configure Environment As Complete
+      file:
+        path: "{{ todd_dir }}/.make_configureenv_complete"
+        state: "touch"
+      when: make_configureenv.changed
+
+    - name: GOPATH Owner  #Needs to be changed to ensure idempotency
+#      file:
+#        path: "/home/vagrant/go"
+#        owner: "vagrant"
+#        group: "vagrant"
+#        recurse: yes
+#        state: "directory"
+      shell: chown vagrant:vagrant $(find /home/vagrant/go | grep -v todd) warn=no
 
 - name: Prepping for ToDD
   hosts: all
@@ -92,7 +114,20 @@
         regexp: "^cd "
         line: "cd {{ todd_dir }}"
 
+    - name: Checking Status of Compile ToDD
+      stat:
+        path: "{{ todd_dir }}/.todd_compile_complete"
+      register: "todd_compile_complete"
+
     - name: Compile ToDD
       shell: ". /home/vagrant/.profile && make"
       args:
         chdir: "{{ todd_dir }}"
+      register: "todd_compiled"
+      when: not todd_compile_complete.stat.exists
+
+    - name: Marking Status of Compile ToDD as Complete
+      file:
+        path: "{{ todd_dir }}/.todd_compile_complete"
+        state: touch
+      when: todd_compiled.changed
