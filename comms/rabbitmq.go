@@ -35,11 +35,20 @@ const (
 func newRabbitMQComms(cfg config.Config) *rabbitMQComms {
 	var rmq rabbitMQComms
 	rmq.config = cfg
+
+	rmq.queueUrl = fmt.Sprintf("amqp://%s:%s@%s:%s/",
+		rmq.config.Comms.User,
+		rmq.config.Comms.Password,
+		rmq.config.Comms.Host,
+		rmq.config.Comms.Port,
+	)
+
 	return &rmq
 }
 
 type rabbitMQComms struct {
-	config config.Config
+	config   config.Config
+	queueUrl string
 }
 
 // connectRabbitMQ wraps the amqp.Dial function in order to provide connection retry functionality
@@ -63,15 +72,8 @@ func connectRabbitMQ(queueUrl string) (*amqp.Connection, error) {
 // AdvertiseAgent will place an agent advertisement message on the message queue
 func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 
-	queueUrl := fmt.Sprintf("amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
 	// Connect to RabbitMQ with retry logic
-	conn, err := connectRabbitMQ(queueUrl)
+	conn, err := connectRabbitMQ(rmq.queueUrl)
 	if err != nil {
 		log.Error("(AdvertiseAgent) Failed to connect to RabbitMQ")
 		return err
@@ -158,15 +160,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 
 	// TODO(mierdin): does func param need to be a pointer?
 
-	queue_url := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
-	conn, err := amqp.Dial(queue_url)
+	conn, err := amqp.Dial(rmq.queueUrl)
 	if err != nil {
 		log.Error(err)
 		log.Error("Failed to connect to RabbitMQ")
@@ -298,15 +292,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) {
 // that have been added to a group
 func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) {
 
-	queue_url := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
-	conn, err := amqp.Dial(queue_url)
+	conn, err := amqp.Dial(rmq.queueUrl)
 	if err != nil {
 		log.Error(err)
 		log.Error("Failed to connect to RabbitMQ")
@@ -386,16 +372,8 @@ func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) {
 // ListenForTasks is a method that recieves task notices from the server
 func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
-	queueUrl := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
 	// Connect to RabbitMQ with retry logic
-	conn, err := connectRabbitMQ(queueUrl)
+	conn, err := connectRabbitMQ(rmq.queueUrl)
 	if err != nil {
 		log.Error("(AdvertiseAgent) Failed to connect to RabbitMQ")
 		return err
@@ -631,16 +609,8 @@ rereg:
 // ListenForGroupTasks is a method that recieves tasks from the server that are intended for groups
 func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) error {
 
-	queueUrl := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
 	// Connect to RabbitMQ with retry logic
-	conn, err := connectRabbitMQ(queueUrl)
+	conn, err := connectRabbitMQ(rmq.queueUrl)
 	if err != nil {
 		log.Error("(AdvertiseAgent) Failed to connect to RabbitMQ")
 		return err
@@ -714,17 +684,9 @@ func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) 
 // SendResponse will send a response object onto the statically-defined queue for receiving such messages.
 func (rmq rabbitMQComms) SendResponse(resp responses.Response) {
 
-	queue_url := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
 	queueName := "agentresponses"
 
-	conn, err := amqp.Dial(queue_url)
+	conn, err := amqp.Dial(rmq.queueUrl)
 	if err != nil {
 		log.Error(err)
 		log.Error("Failed to connect to RabbitMQ")
@@ -804,17 +766,9 @@ func (rmq rabbitMQComms) SendResponse(resp responses.Response) {
 // ListenForResponses listens for responses from an agent
 func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool) {
 
-	queue_url := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s/",
-		rmq.config.AMQP.User,
-		rmq.config.AMQP.Password,
-		rmq.config.AMQP.Host,
-		rmq.config.AMQP.Port,
-	)
-
 	queueName := "agentresponses"
 
-	conn, err := amqp.Dial(queue_url)
+	conn, err := amqp.Dial(rmq.queueUrl)
 	if err != nil {
 		log.Error(err)
 		log.Error("Failed to connect to RabbitMQ")
