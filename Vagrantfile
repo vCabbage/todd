@@ -19,7 +19,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
     todddev.vm.host_name = "todddev"
     todddev.vm.network "private_network", type: "dhcp"
-    todddev.vm.network "public_network", ip: "10.12.0.70", bridge: "en4: Thunderbolt Ethernet"
+    todddev.vm.network "public_network", type: "dhcp"
     todddev.vm.provision "ansible" do |ansible|
         ansible.playbook = "scripts/ansible-todd-dev.yml"
     end
