@@ -99,7 +99,7 @@ func hashAssets(dir string) map[string]string {
 	return hashes
 }
 
-// hashAssets returns a mapping of filenames to their SHA256 hash.
+// hashFiles returns a mapping of filenames to their SHA256 hash.
 //
 // dir is the path to the files on the filesystem.
 func hashFiles(dir string) (map[string]string, error) {
