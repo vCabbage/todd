@@ -3,7 +3,9 @@ Configuring ToDD
 
 ToDD uses configuration files (typically found in /etc/todd) to control it's behavior. The server and the agent use their own individual config files, and sample files are shown below.
 
+.. topic:: NOTE
 
+   Configuration files for both the ToDD Server and ToDD Agent binaries load once at initial start. So, in order to apply any changes to the configuration, these processes need to be restarted.
 
 First, the server configuration file (usually /etc/todd/server/cfg) contains configurations for all services that the server will require - things like integrated databases, communications plugins, and internal calculations. Here is a sample server configuration file, with comments inline:
 
