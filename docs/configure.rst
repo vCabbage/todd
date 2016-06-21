@@ -18,16 +18,12 @@ Server Configuration
     Host = 0.0.0.0
     Port = 8080
 
-    # DEPRECATED SOON! (This was the original configuration for comms, but this
-    # AMQP section will be condensed under the "Comms" section soon.)
-    [AMQP]
+    [Comms]
+    Plugin = rabbitmq
     User = guest
     Password = guest
     Host = 192.168.0.10
     Port = 5672
-
-    [Comms]
-    Plugin = rabbitmq
 
     # ToDD's Assets API - allows agents to download assets like collectors, testlets, etc.
     [Assets] 
