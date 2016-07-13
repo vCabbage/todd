@@ -11,19 +11,18 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
 )
 
 // Delete will send a request to remove an existing ToDD Object
-func (capi ClientApi) Delete(conf map[string]string, objType, objLabel string) {
+func (capi ClientApi) Delete(conf map[string]string, objType, objLabel string) error {
 
 	// If insufficient subargs were provided, error out
 	if objType == "" || objLabel == "" {
-		fmt.Println("Error, need to provide type and label")
-		os.Exit(1)
+		fmt.Println("Error, need to provide type and label (Ex. 'todd delete group datacenter')")
+		return errors.New("invalid syntax")
 	}
 
 	// anonymous struct to hold our delete info
@@ -38,7 +37,7 @@ func (capi ClientApi) Delete(conf map[string]string, objType, objLabel string) {
 	// Marshal deleteinfo into JSON
 	json_str, err := json.Marshal(deleteinfo)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// Construct API request, and send POST to server for this object
@@ -48,25 +47,24 @@ func (capi ClientApi) Delete(conf map[string]string, objType, objLabel string) {
 	var jsonByte = []byte(json_str)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonByte))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer resp.Body.Close()
 
-	// Print a regular OK message if object was written successfully - else print some debug info
+	// Print a regular OK message if object was written successfully - else print the HTTP status code
 	if resp.Status == "200 OK" {
 		fmt.Println("[OK]")
 	} else {
-		fmt.Println("response Status:", resp.Status)
-		fmt.Println("response Headers:", resp.Header)
-		body, _ := ioutil.ReadAll(resp.Body)
-		fmt.Println("response Body:", string(body))
+		fmt.Println(resp.Status)
+		return errors.New(resp.Status)
 	}
 
+	return nil
 }

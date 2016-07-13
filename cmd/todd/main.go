@@ -56,13 +56,13 @@ func main() {
 						"host": host,
 						"port": port,
 					},
-					c.Args().First(),
+					c.Args().Get(0),
 				)
 				if err != nil {
 					fmt.Println(err)
 					os.Exit(1)
 				}
-				clientapi.DisplayAgents(agents, !(c.Args().First() == ""))
+				clientapi.DisplayAgents(agents, !(c.Args().Get(0) == ""))
 			},
 		},
 
@@ -72,13 +72,17 @@ func main() {
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
 
-				clientapi.Create(
+				err := clientapi.Create(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
-					c.Args().First(),
+					c.Args().Get(0),
 				)
+				if err != nil {
+					fmt.Println("Unable to create object on ToDD server.")
+					os.Exit(1)
+				}
 			},
 		},
 
@@ -87,14 +91,18 @@ func main() {
 			Name:  "delete",
 			Usage: "Delete ToDD object",
 			Action: func(c *cli.Context) {
-				clientapi.Delete(
+				err := clientapi.Delete(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
-					c.Args()[1],
+					c.Args().Get(0),
+					c.Args().Get(1),
 				)
+				if err != nil {
+					fmt.Println("ERROR - Are you sure you provided the right object type and/or label?")
+					os.Exit(1)
+				}
 			},
 		},
 
@@ -103,12 +111,16 @@ func main() {
 			Name:  "groups",
 			Usage: "Show current agent-to-group mappings",
 			Action: func(c *cli.Context) {
-				clientapi.Groups(
+				err := clientapi.Groups(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
 				)
+				if err != nil {
+					fmt.Println("ERROR - Unable to obtain current group mapping")
+					os.Exit(1)
+				}
 			},
 		},
 
@@ -117,13 +129,17 @@ func main() {
 			Name:  "objects",
 			Usage: "Show information about installed group objects",
 			Action: func(c *cli.Context) {
-				clientapi.Objects(
+				err := clientapi.Objects(
 					map[string]string{
 						"host": host,
 						"port": port,
 					},
-					c.Args()[0],
+					c.Args().Get(0),
 				)
+				if err != nil {
+					fmt.Println("ERROR - Unable to retrieve object")
+					os.Exit(1)
+				}
 			},
 		},
 
@@ -154,7 +170,7 @@ func main() {
 			},
 			Usage: "Execute an already uploaded testrun object",
 			Action: func(c *cli.Context) {
-				clientapi.Run(
+				err := clientapi.Run(
 					map[string]string{
 						"host":        host,
 						"port":        port,
@@ -162,10 +178,15 @@ func main() {
 						"sourceApp":   c.String("source-app"),
 						"sourceArgs":  c.String("source-args"),
 					},
-					c.Args()[0],
+					c.Args().Get(0),
 					c.Bool("j"),
 					c.Bool("y"),
 				)
+				if err != nil {
+					fmt.Println("ERROR - Problem running testrun")
+					os.Exit(1)
+				}
+
 			},
 		},
 	}
