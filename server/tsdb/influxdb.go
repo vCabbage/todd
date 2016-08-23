@@ -44,6 +44,7 @@ func (ifdb influxDB) Init() error {
 
 	// Create database
 	_, err = c.Query(influx.Query{
+		// From docs: "If you attempt to create a database that already exists, InfluxDB does not return an error."
 		Command: fmt.Sprintf("CREATE DATABASE %s", ifdb.config.TSDB.DatabaseName),
 	})
 	if err != nil {
