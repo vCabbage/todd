@@ -31,6 +31,29 @@ type influxDB struct {
 	config config.Config
 }
 
+func (ifdb influxDB) Init() error {
+	// Make client
+	c, err := influx.NewHTTPClient(influx.HTTPConfig{
+		Addr: fmt.Sprintf("http://%s:%s", ifdb.config.TSDB.Host, ifdb.config.TSDB.Port),
+	})
+	if err != nil {
+		log.Error("Error creating InfluxDB Client: ", err.Error())
+		return err
+	}
+	defer c.Close()
+
+	// Create database
+	_, err = c.Query(influx.Query{
+		Command: fmt.Sprintf("CREATE DATABASE %s", ifdb.config.TSDB.DatabaseName),
+	})
+	if err != nil {
+		log.Errorf("Error creating InfluxDB database %q: %v\n", ifdb.config.TSDB.DatabaseName, err)
+		return err
+	}
+
+	return nil
+}
+
 // WriteData will write the resulting testrun data to influxdb as a batch of points - containing
 // important information like metrics and which agent reported them.
 func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData map[string]map[string]map[string]string) error {

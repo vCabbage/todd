@@ -19,6 +19,8 @@ import (
 
 // TSDBPackage represents all of the behavior that a ToDD TSDB plugin must support
 type TSDBPackage interface {
+	// Init performs any setup functions necessary for the DB
+	Init() error
 	WriteData(string, string, string, map[string]map[string]map[string]string) error
 }
 

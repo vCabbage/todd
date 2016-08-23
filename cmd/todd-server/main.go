@@ -19,6 +19,7 @@ import (
 	"github.com/Mierdin/todd/config"
 	"github.com/Mierdin/todd/db"
 	"github.com/Mierdin/todd/server/grouping"
+	"github.com/Mierdin/todd/server/tsdb"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -65,6 +66,12 @@ func main() {
 
 	if err := tdb.Init(); err != nil {
 		log.Fatalf("Error initializing database: %v\n", err)
+	}
+
+	// Initialize TSDB
+	tsDB := tsdb.NewToddTSDB(cfg)
+	if err := tsDB.Init(); err != nil {
+		log.Fatal("Error initializing time series database: ", err)
 	}
 
 	// Initialize API
