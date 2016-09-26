@@ -1,24 +1,18 @@
-ToDD Testlets
+Testlets
 ================================
 
-Tests in ToDD are powered by something called "testlets". These are executable files (i.e. scripts, binaries) that accept a standard set of input, run a test application, and provide a standard set of output containing metrics from that test.
+Testing applications are referred to "testlets" in ToDD. This is a handy way of referring to "whatever is actually doing the work". ToDD simply orchestrates this work.
 
-This allows the user to simply "use" this application, and specify which agents run this application. All of the complicated stuff with respect to sending arguments to the underlying testing application as well as parsing the output, is performed inside the testlet.
-
-.. image:: images/testlet.png
-
-The testlet is actually run by the ToDD agent, so if there are 3 agents participating in a test, then 3 testlets are running. All logic that performs the test should be contained within the 
-
-Testrun Definition
-------------------
-
-When you want to run a certain testlet, you refer to it by name. There are a number of testlets built in to ToDD and are therefore reserved:
+There are a number of testlets built-in to the ToDD agent and are usable simply by installing the agent on a system:
 
 * http
 * bandwidth
 * ping
+* portknock
 
-You can, of course, build your own testlet (provided it follows the standard defined on this page) and refer to it by it's filename.
+These have their own separate repositories and are distributed alongside ToDD proper. They are written in Go for a number of reasons. First, it makes it easy for the testlets to honor the testlet format by leveraging some common code in the ToDD repository. However, the testlets are still their own binary. In addition, it allows ToDD to execute tests consistently across platforms (The old model of using bash scripts meant the tests had to be run on a certain platform for which that testlet knew how to parse the output)
+
+If you don't want to use any of the built-in testlets, you can, of course, build your own testlet (provided it follows the standard defined on this page) and refer to it by it's filename.
 
 Check Mode
 ----------
@@ -32,40 +26,28 @@ For instance, when the ToDD agent runs the "ping" testlet in check mode, it woul
 
 That said, the ToDD Server will distribute testrun instructions to the agents in two phases:
 
-* Install - run the referenced testlet in check mode, and record all params in local agent cache
-* Execute - run the installed testrun instruction
+However, please see "Custom Testlets", and you'll find it's quite easy to build your own testlets and run them with ToDD. This extensibility was a core design principle of ToDD since the beginning of the project.
 
-Input
------
-There is little to no similarity between various testing applications with respect to the parameters required by those applications. However, in order to simplify things for the ToDD agent, the testlet - due to it's place as a "wrapper" for a testing application - standardizes this input so the ToDD agent can invoke any testlet in a consistent manner
 
-.. code-block:: text
+Native Testlet Design Principles
+--------------------------------
 
-    ./testletname < target > < args >
 
-The ToDD agent will execute the testlet as it exists on the system, and will pass a few arguments to it (meaning the testlet must support and honor these arguments):
+Need to talk about the native tests you've built in, and turn the "testlets" doc into more of a "so you want to build your own, eh?"
 
-* "target" - this is always the first parameter - represents the IP address or FQDN of the target for this test instance.
-* "args" - any arguments required by the underlying application. These should be passed to that application via the testlet
+Also need to figure out if you want to refer to both native and non-native as "testlets", or maybe reserve that for non-native
 
-Output
-------
-The output for every testlet is a single-level JSON object, which contains key-value pairs for the metrics gathered for that testlet.
 
-Since the ToDD agent is responsible for executing a testlet, it is also watching stdout for the testlet to provide this JSON object. This is one of the things that make testlets a very flexible method of performing tests - since it only needs to output these metrics as JSON to stdout, the testlet can be written in any language, as long as they support the arguments described in the "Input" section.
+Need a design guide outlining some requirements for native testlets:
 
-A sample JSON object that the "ping" testlet will provide is shown below:
+* Testlets must honor the "kill" channel passed to the RunTestlet function. If a "true" value is passed into that channel, the testlet must quit immediately.
 
-.. code-block:: text
+* Need to put some specifics together regarding testlets that provide some kind of "server" functionality, kind of like what you've done for custom testlets
 
-    {
-        "avg_latency_ms": "27.007",
-        "packet_loss_percentage": "0"
-    }
+* How do args work in native testlets? It's a bit awkward to continue to use command-line style args in a native testlet but might be necessary to preserve consistency for the user.
 
-This specific output covers the metrics for a single testlet run, which means that this is relevant to only a single target, run by a single ToDD agent. The ToDD agent will receive this output once for each target in the testrun, and submit this up to the ToDD server for collection.
+* How to handle vendoring? If a testlet uses a library to run the tests, should the library get vendored with the testlet's repository, or within ToDD proper? Probably the former, but how is it used in that case? Just need to have a strategy here. (You probably vendored such libs in todd proper in order to develop them, so make sure you remove them once they're not needed)
 
-.. NOTE::
-   The ToDD Server will also aggregate each agent's report to a single metric document for the entire testrun, so that it's easy to see the metrics for each source-to-target relationship for a testrun.
+* How are errors returned from the testlet logic? If a testlet returns an error, how is this handled?
 
-The ToDD agent does not have an opinion on the values contained in the keys or values for this JSON object, or how many k/v pairs there are - only that it is valid JSON, and is a single level (no nested objects, lists, etc).
+* How does development work? Do you clone the testlet repo next to the todd repo, kind of like devstack?

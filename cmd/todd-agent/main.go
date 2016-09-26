@@ -9,19 +9,21 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
+
 	"github.com/Mierdin/todd/agent/cache"
 	"github.com/Mierdin/todd/agent/defs"
 	"github.com/Mierdin/todd/agent/facts"
-	"github.com/Mierdin/todd/agent/testing"
+	"github.com/Mierdin/todd/agent/responses"
 	"github.com/Mierdin/todd/comms"
 	"github.com/Mierdin/todd/config"
 	"github.com/Mierdin/todd/hostresources"
-	log "github.com/Sirupsen/logrus"
 )
 
 // Command-line Arguments
@@ -65,7 +67,7 @@ func main() {
 	log.Infof("ToDD Agent Activated: %s", uuid)
 
 	// Start test data reporting service
-	go testing.WatchForFinishedTestRuns(cfg)
+	go watchForFinishedTestRuns(cfg)
 
 	// Construct comms package
 	tc, err := comms.NewToDDComms(cfg)
@@ -117,5 +119,50 @@ func main() {
 
 		time.Sleep(15 * time.Second) // TODO(moswalt): make configurable
 	}
+
+}
+
+// watchForFinishedTestRuns simply watches the local cache for any test runs that have test data.
+// It will periodically look at the table and send any present test data back to the server as a response.
+// When the server has successfully received this data, it will send a task back to this specific agent
+// to delete this row from the cache.
+func watchForFinishedTestRuns(cfg config.Config) error {
+
+	var ac = cache.NewAgentCache(cfg)
+
+	agentUuid := ac.GetKeyValue("uuid")
+
+	for {
+
+		time.Sleep(5000 * time.Millisecond)
+
+		testruns, err := ac.GetFinishedTestRuns()
+		if err != nil {
+			log.Error("Problem retrieving finished test runs")
+			return errors.New("Problem retrieving finished test runs")
+		}
+
+		for testUuid, testData := range testruns {
+
+			log.Debug("Found ripe testrun: ", testUuid)
+
+			utdr := responses.UploadTestDataResponse{
+				TestUuid: testUuid,
+				TestData: testData,
+			}
+			utdr.AgentUuid = agentUuid
+			utdr.Type = "TestData" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
+
+			tc, err := comms.NewToDDComms(cfg)
+			if err != nil {
+				return err
+			}
+			tc.CommsPackage.SendResponse(utdr)
+
+		}
+
+	}
+
+	return nil
 
 }

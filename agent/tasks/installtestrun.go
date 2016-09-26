@@ -11,8 +11,6 @@ package tasks
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -20,6 +18,7 @@ import (
 
 	"github.com/Mierdin/todd/agent/cache"
 	"github.com/Mierdin/todd/agent/defs"
+	"github.com/Mierdin/todd/agent/testing"
 	"github.com/Mierdin/todd/config"
 )
 
@@ -42,16 +41,15 @@ func (itt InstallTestRunTask) Run() error {
 		return errors.New("Testlet parameter for this testrun is null")
 	}
 
-	// Generate path to testlet and make sure it exists.
-	testlet_path := fmt.Sprintf("%s/assets/testlets/%s", itt.Config.LocalResources.OptDir, itt.Tr.Testlet)
-	if _, err := os.Stat(testlet_path); os.IsNotExist(err) {
-		log.Errorf("Testlet %s does not exist on this agent", itt.Tr.Testlet)
-		return errors.New("Error installing testrun - testlet doesn't exist on this agent.")
+	// Determine if this is a native testlet
+	testletPath, err := testing.GetTestletPath(itt.Tr.Testlet, itt.Config.LocalResources.OptDir)
+	if err != nil {
+		return err
 	}
 
 	// Run the testlet in check mode to verify that everything is okay to run this test
-	log.Debug("Running testlet in check mode: ", testlet_path)
-	cmd := exec.Command(testlet_path, "check")
+	log.Debug("Running testlet in check mode: ", testletPath)
+	cmd := exec.Command(testletPath, "check")
 
 	// Stdout buffer
 	cmdOutput := &bytes.Buffer{}
@@ -62,7 +60,7 @@ func (itt InstallTestRunTask) Run() error {
 
 	// This is probably the best cross-platform way to see if check mode passed.
 	if strings.Contains(string(cmdOutput.Bytes()), "Check mode PASSED") {
-		log.Debugf("Check mode for %s passed", testlet_path)
+		log.Debugf("Check mode for %s passed", testletPath)
 	} else {
 		log.Error("Testlet returned an error during check mode: ", string(cmdOutput.Bytes()))
 		return errors.New("Testlet returned an error during check mode")
@@ -70,7 +68,7 @@ func (itt InstallTestRunTask) Run() error {
 
 	// Insert testrun into agent cache
 	var ac = cache.NewAgentCache(itt.Config)
-	err := ac.InsertTestRun(itt.Tr)
+	err = ac.InsertTestRun(itt.Tr)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Problem installing test run into agent cache")
