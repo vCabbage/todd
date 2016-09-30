@@ -3,7 +3,7 @@ Additional Resources
 
 Collaboration
 ----------
-The most active platform at the moment is the #todd channel in the "Network to Code" slack team. This team is free and open to join - just head over to `networktocode.slack.com <https://networktocode.slack.com/>`_ to sign up, and look for the #todd channel once in.
+The most active platform at the moment is the #todd channel in the "Network to Code" slack team. This team is free and open to join - just head over to `http://slack.networktocode.com/ <http://slack.networktocode.com/>`_ to sign up, and look for the #todd channel once in.
 
 ToDD also has a `mailing list <https://groups.google.com/forum/#!forum/todd-dev/>`_, for all matters related to development, or questions about getting ToDD running on your own systems. Please feel free to join and send a message if you have any questions! We will be as helpful as possible.
 
