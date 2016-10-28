@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -164,7 +165,7 @@ func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 
 // ListenForAgent will listen on the message queue for new agent advertisements.
 // It is meant to be run as a goroutine
-func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) error {
+func (rmq rabbitMQComms) ListenForAgent(assets *map[string]map[string]string, amu *sync.Mutex) error {
 
 	// TODO(mierdin): does func param need to be a pointer?
 
@@ -217,7 +218,10 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) err
 
 	go func() {
 		for d := range msgs {
+
 			log.Debugf("Agent advertisement recieved: %s", d.Body)
+
+			amu.Lock()
 
 			var agent defs.AgentAdvert
 			err = json.Unmarshal(d.Body, &agent)
@@ -228,7 +232,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) err
 			var assetList []string
 
 			// assets is the asset map from the SERVER's perspective
-			for asset_type, asset_hashes := range assets {
+			for asset_type, asset_hashes := range *assets {
 
 				var agentAssets map[string]string
 
@@ -292,6 +296,8 @@ func (rmq rabbitMQComms) ListenForAgent(assets map[string]map[string]string) err
 				task.Assets = assetList
 				rmq.SendTask(agent.Uuid, task)
 			}
+
+			amu.Unlock()
 		}
 	}()
 

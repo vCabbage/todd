@@ -12,6 +12,7 @@ package comms
 
 import (
 	"errors"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -33,8 +34,8 @@ type CommsPackage interface {
 	// (agent advertisement to advertise)
 	AdvertiseAgent(defs.AgentAdvert) error
 
-	// (map of assets:hashes)
-	ListenForAgent(map[string]map[string]string) error
+	// (map of assets:hashes, lock for asset map)
+	ListenForAgent(*map[string]map[string]string, *sync.Mutex) error
 
 	// (uuid)
 	ListenForTasks(string) error
