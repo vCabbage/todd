@@ -12,7 +12,6 @@ package comms
 
 import (
 	"errors"
-	"sync"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -21,6 +20,10 @@ import (
 	"github.com/toddproject/todd/agent/tasks"
 	"github.com/toddproject/todd/config"
 )
+
+type assetProvider interface {
+	Assets() map[string]map[string]string
+}
 
 // CommsPackage will ensure that whatever specific comms struct is loaded at compile time will support
 // all of the necessary features/functions that we need to make ToDD work. In short, this interface
@@ -35,7 +38,7 @@ type CommsPackage interface {
 	AdvertiseAgent(defs.AgentAdvert) error
 
 	// (map of assets:hashes, lock for asset map)
-	ListenForAgent(*map[string]map[string]string, *sync.Mutex) error
+	ListenForAgent(assetProvider) error
 
 	// (uuid)
 	ListenForTasks(string) error

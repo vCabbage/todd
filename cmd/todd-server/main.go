@@ -58,10 +58,7 @@ func main() {
 	}
 
 	// Start serving collectors and testlets, and retrieve map of names and hashes
-	assets, amu, err := serveAssets(cfg)
-	if err != nil {
-		log.Fatalf("Problem serving collectors and testlets: %v\n", err)
-	}
+	assets := newAssetConfig(cfg)
 
 	// Perform database initialization tasks
 	tdb, err := db.NewToddDB(cfg)
@@ -87,7 +84,7 @@ func main() {
 
 	go func() {
 		for {
-			err := tc.CommsPackage.ListenForAgent(assets, amu)
+			err := tc.CommsPackage.ListenForAgent(assets)
 			if err != nil {
 				log.Fatalf("Error listening for ToDD Agents")
 			}
