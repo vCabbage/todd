@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Mierdin/todd/assets"
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/toddproject/todd/assets"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/hostresources"
 )
