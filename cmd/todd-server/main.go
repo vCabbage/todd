@@ -15,11 +15,16 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+
 	toddapi "github.com/toddproject/todd/api/server"
 	"github.com/toddproject/todd/comms"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/db"
 	"github.com/toddproject/todd/server/grouping"
+)
+
+var (
+	todd_version = "0.0.1"
 )
 
 // Command-line Arguments
@@ -47,15 +52,13 @@ func init() {
 
 func main() {
 
-	todd_version := "0.0.1"
-
 	cfg, err := config.GetConfig(arg_config)
 	if err != nil {
-		os.Exit(1)
+		log.Fatalf("Problem getting configuration: %v\n", err)
 	}
 
 	// Start serving collectors and testlets, and retrieve map of names and hashes
-	assets := serveAssets(cfg)
+	assets := newAssetConfig(cfg)
 
 	// Perform database initialization tasks
 	tdb, err := db.NewToddDB(cfg)
@@ -76,7 +79,7 @@ func main() {
 	// Start listening for agent advertisements
 	tc, err := comms.NewToDDComms(cfg)
 	if err != nil {
-		os.Exit(1)
+		log.Fatalf("Problem connecting to comms: %v\n", err)
 	}
 
 	go func() {

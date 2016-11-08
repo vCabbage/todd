@@ -117,7 +117,7 @@ func main() {
 			log.Error("Failed to advertise agent after several retries")
 		}
 
-		time.Sleep(15 * time.Second) // TODO(moswalt): make configurable
+		time.Sleep(10 * time.Second) // TODO(moswalt): make configurable
 	}
 
 }

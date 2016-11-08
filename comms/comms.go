@@ -21,6 +21,10 @@ import (
 	"github.com/toddproject/todd/config"
 )
 
+type assetProvider interface {
+	Assets() map[string]map[string]string
+}
+
 // CommsPackage will ensure that whatever specific comms struct is loaded at compile time will support
 // all of the necessary features/functions that we need to make ToDD work. In short, this interface
 // represents a list of things that the server and agents do on the message queue.
@@ -33,8 +37,8 @@ type CommsPackage interface {
 	// (agent advertisement to advertise)
 	AdvertiseAgent(defs.AgentAdvert) error
 
-	// (map of assets:hashes)
-	ListenForAgent(map[string]map[string]string) error
+	// (map of assets:hashes, lock for asset map)
+	ListenForAgent(assetProvider) error
 
 	// (uuid)
 	ListenForTasks(string) error

@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -47,13 +46,15 @@ func (dat DownloadAssetTask) Run() error {
 		case strings.Contains(assetUrl, "testlets"):
 			assetDir = dat.TestletDir
 		default:
-			log.Error("Invalid asset download URL received")
-			os.Exit(1)
+			errorMsg := "Invalid asset download URL received"
+			log.Error(errorMsg)
+			return errors.New(errorMsg)
 		}
 
 		err := dat.downloadAsset(assetUrl, assetDir)
 		if err != nil {
-			log.Error("Problem downloading asset ", assetUrl)
+			log.Error(err)
+			return err
 		}
 	}
 
@@ -68,7 +69,7 @@ func (dat DownloadAssetTask) downloadAsset(url, directory string) error {
 	fileName = fmt.Sprintf("%s/%s", directory, fileName)
 	log.Info("Downloading ", url, " to ", fileName)
 
-	// TODO: check file existence first with io.IsExist
+	// TODO: What if this already exists? Consider checking file existence first with io.IsExist?
 	output, err := dat.Fs.Create(fileName)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error while creating", fileName, "-", err))
@@ -76,19 +77,24 @@ func (dat DownloadAssetTask) downloadAsset(url, directory string) error {
 	defer output.Close()
 
 	response, err := dat.HTTPClient.Get(url)
-	if err != nil {
-		return errors.New(fmt.Sprintf("Error while downloading", url, "-", err))
-	}
 	defer response.Body.Close()
+	if err != nil || response.StatusCode != 200 {
+
+		// If we have a problem retrieving the testlet, we want to return immediately,
+		// instead of writing an empty file to disk
+		log.Error(fmt.Sprintf("Error while downloading '%s': %s", url, response.Status))
+		return err
+	}
 
 	n, err := dat.Ios.Copy(output, response.Body)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error while downloading", url, "-", err))
+		log.Error(fmt.Sprintf("Error while writing '%s' to disk", url))
+		return err
 	}
 	err = dat.Fs.Chmod(fileName, 0744)
 	if err != nil {
-		// For now, let's just throw a warning in the logs. It's not the end of the world if this fails; it may
-		// be a limited issue. Worst case is the agent simply reports no facts.
+
+		// TODO(mierdin): currently unhandled; may want to do something further
 		log.Warn("Problem setting execute permission on downloaded script")
 	}
 
