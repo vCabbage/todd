@@ -10,7 +10,7 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 branch="latest"
-toddimage=mierdin/todd:$branch
+toddimage=toddproject/todd:$branch
 
 alias dtodd='docker run --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network"'
 
