@@ -34,5 +34,5 @@ tcp_window_size_mbyte=$(echo $output | tr '\n' ' ' | sed -n 's/.*TCP window size
 transfer_mbytes=$(echo $output | tr '\n' ' ' | sed -n 's/.*sec *\(.*\) MBytes.*/\1/p')
 bandwidth_mbits_sec=$(echo $output | tr '\n' ' ' | sed -n 's/.*MBytes *\(.*\) Mbits.*/\1/p')
 
-teslet_data='{"tcp_window_size_mbyte":"'$tcp_window_size_mbyte'", "transfer_mbytes":"'$transfer_mbytes'", "bandwidth_mbits_sec":"'$bandwidth_mbits_sec'"}'
+teslet_data='{"tcp_window_size_mbyte":'$tcp_window_size_mbyte', "transfer_mbytes":'$transfer_mbytes', "bandwidth_mbits_sec":'$bandwidth_mbits_sec'}'
 echo $teslet_data
