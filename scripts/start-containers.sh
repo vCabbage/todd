@@ -9,10 +9,16 @@
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-branch="latest"
-toddimage=mierdin/todd:$branch
+branch=$(git symbolic-ref -q HEAD)
+branch=${branch##refs/heads/}
+branch=${branch:-HEAD}
 
-alias dtodd='docker run --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network"'
+toddimage=toddproject/todd:$branch
+
+function dtodd {
+    docker run --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" "$@"
+    sleep 5
+}
 
 # Clean up old containers
 function cleanup {
@@ -122,7 +128,7 @@ function runintegrationtests {
 
 }
 
-if hash docker-machaine 2> /dev/null
+if hash docker-machine 2> /dev/null
 then
     echo "Starting docker machine"
     docker-machine start docker-dev
@@ -147,6 +153,19 @@ cleanup
 
 startinfra
 
+# If any arguments are being passed in, then we want to do a "docker build" locally
+if [ -n "$1" ]
+then
+    echo "Performing 'docker build'..."
+    docker build -t toddproject/todd:$branch -f ../Dockerfile ..
+
+    if [ $? != 0 ]
+    then
+        echo "Failure building Docker image"
+        exit $?
+    fi
+fi
+
 # If first argument is "integration", start that topology and run tests
 if [ "$1" == "integration" ]
 then
@@ -158,20 +177,12 @@ then
 
     runintegrationtests
     exit $?
-fi
-
-# If first argument is "interop", start that demo
-if [ "$1" == "interop" ]
-then
-    sleep 10
-
-    starttodd 3 /etc/todd/server-interop.cfg /etc/todd/agent-interop.cfg
-    exit $?
-fi
-
-# Finally, if something's being passed in, it's probably number of agents, followed by configs.
-if [ -n "$1" ]
-then
+else
+    # If the first argument isn't "integration", then it's probably number of agents, followed by configs.
+    # This can be used to perform load testing in Docker, for instance by using the same configurations as
+    # the integration tests, but with a lot more agents:
+    #
+    # i.e. "./start-containers.sh 30 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg"
     sleep 10
     
     starttodd "$1" "$2" "$3"
