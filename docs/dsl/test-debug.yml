@@ -1,0 +1,13 @@
+---
+# Example test file
+# ping-internals-1621122610       testrun {uncontrolled map[app:ping args:-w 20 -i 0.2 name:internals] [162.112.26.10]}
+type: testrun
+label: ping-internals-1621122610
+spec:
+    targettype: uncontrolled
+    source:
+        name: datacenter
+        app: oldping
+        args: "-w 20 -i 0.2"
+    target:
+    - 8.8.8.8

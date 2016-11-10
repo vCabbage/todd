@@ -4,4 +4,4 @@ label: red
 spec:
     group: red
     matches:
-    - hostname: "todd-agent-[0-2]"
+    - hostname: "todd-agent-.*[02468]"
