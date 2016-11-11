@@ -1,0 +1,12 @@
+---
+type: testrun
+label: inttest-http
+spec:
+    targettype: uncontrolled
+    source:
+        name: red
+        app: http
+        args: ""
+    target:
+    - salesforce.com
+    - portal.office.com
