@@ -98,14 +98,17 @@ function starttodd {
 
 function itsetup {
 
-    # Upload grouping files
-    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+    yaml_files=( \
+        group-inttest-red.yml \
+        group-inttest-blue.yml \
+        testrun-inttest-iperf.yml \
+        testrun-inttest-ping.yml \
+        testrun-inttest-http.yml \
+    )
 
-    # Upload testrun files
-    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
-    
+    for i in ${yaml_files[@]}; do
+        cat $DIR/../docs/dsl/integration/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+    done
 }
 
 function runintegrationtests {
@@ -125,6 +128,8 @@ function runintegrationtests {
     dtodd run inttest-ping -y -j
 
     dtodd run inttest-iperf -y -j
+
+    dtodd run inttest-http -y -j
 
 }
 
@@ -157,7 +162,7 @@ startinfra
 if [ -n "$1" ]
 then
     echo "Performing 'docker build'..."
-    docker build -t toddproject/todd:$branch -f ../Dockerfile ..
+    docker build -t toddproject/todd:$branch -f ../Dockerfile .. > /dev/null
 
     if [ $? != 0 ]
     then
