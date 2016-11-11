@@ -66,25 +66,33 @@ time_redirect=$(echo $output | sed -n 's/.*Redirect time: \(.*\) _ENDQ.*/\1/p')
 time_starttransfer=$(echo $output | sed -n 's/.*Time to start transfer: \(.*\) _ENDR.*/\1/p')
 url_effective=$(echo $output | sed -n 's/.*Last URL Fetched: \(.*\) _ENDS.*/\1/p')
 
-teslet_data='{
+# TODO You are currently trying to get the HTTP testlet working in the new model. Some of the vars below are causing problems.
+# you need to make sure this works in both unit and integration testing, and then make sure you run "make update_assets", then
+# commit and push those changes.
+# Then you can move into the last task for this issue, which is producing documentation about the testlet standard, specifically that
+# the metrics can be any datatype (it will be passed directly into the TSDB)
+
+
+    # "http_connect":'$http_connect',      # TODO This can output 000, which causes issues
+
+    # "size_download":'$size_download',       # TODO $size_download is empty sometimes
+testlet_data='{
     "http_code":"'$http_code'",
-    "time_namelookup":"'$time_namelookup'",
-    "time_connect":"'$time_connect'",
-    "time_pretransfer":"'$time_pretransfer'",
-    "time_starttransfer":"'$time_starttransfer'",
-    "time_total":"'$time_total'",
+    "time_namelookup":'$time_namelookup',
+    "time_connect":'$time_connect',
+    "time_pretransfer":'$time_pretransfer',
+    "time_starttransfer":'$time_starttransfer',
+    "time_total":'$time_total',
     "content_type":"'$content_type'",
-    "http_connect":"'$http_connect'",
-    "num_connects":"'$num_connects'",
-    "num_redirects":"'$num_redirects'",
-    "size_download":"'$size_download'",
-    "size_header":"'$size_header'",
-    "size_request":"'$size_request'",
-    "size_upload":"'$size_upload'",
-    "speed_download":"'$speed_download'",
-    "speed_upload":"'$speed_upload'",
-    "time_redirect":"'$time_redirect'",
-    "time_starttransfer":"'$time_starttransfer'",
+    "num_connects":'$num_connects',
+    "num_redirects":'$num_redirects',
+    "size_header":'$size_header',
+    "size_request":'$size_request',
+    "size_upload":'$size_upload',
+    "speed_download":'$speed_download',
+    "speed_upload":'$speed_upload',
+    "time_redirect":'$time_redirect',
+    "time_starttransfer":'$time_starttransfer',
     "url_effective":"'$url_effective'"
 }'
-echo $teslet_data
+echo $testlet_data
