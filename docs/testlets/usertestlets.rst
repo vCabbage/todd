@@ -62,13 +62,13 @@ A sample JSON object that the "ping" testlet will provide is shown below:
 .. code-block:: text
 
     {
-        "avg_latency_ms": "27.007",
-        "packet_loss_percentage": "0"
+        "avg_latency_ms": 27.007,
+        "packet_loss_percentage": 0
     }
 
 .. NOTE::
-    The ToDD agent does not have an opinion on the values contained in the keys or values for this JSON object, or how many k/v pairs there are - only that it is valid JSON, and is a single level (no nested objects, lists, etc).
+    The ToDD agent does not have an opinion on the values contained in the keys or values for this JSON object, or how many k/v pairs there are - only that it is valid JSON, and is a single level object (no nested objects, lists, etc). It also doesn't care about the datatype for these metrics. In this case, the first metric is a float, and the second is an integer. Both are passed as-is to the TSDB, or presented to the user.
 
-This specific output covers the metrics for a single testlet run, which means that this is relevant to only a single target, run by a single ToDD agent. The ToDD agent will receive this output once for each target in the testrun, and submit this entire dataset up to the ToDD server via the ``comms`` system when finished.
+The JSON document shown above contains the metrics for a single testlet run, which means that this is relevant to only a single target, run by a single ToDD agent. The ToDD agent will receive this output once for each target in the testrun, and submit this entire dataset up to the ToDD server via the ``comms`` system when finished.
 
 The ToDD Server will also aggregate each agent's report to a single metric document for the entire testrun, so that it's easy to see the metrics for each source-to-target relationship for a testrun.
