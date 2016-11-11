@@ -34,4 +34,4 @@ Finally, compile and install the binaries:
 .. code-block:: text
 
     make
-    sudo make install
+    sudo -E make install
