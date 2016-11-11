@@ -5,11 +5,7 @@
     state: "present"
     regexp: "^export {{ item.varname }}"
     line: "{{ item.varval }}"
-  with_items:
-    - { file: "/home/vagrant/.profile", varname: "GOPATH", varval: "export GOPATH={{ gopath }}" }
-    - { file: "/home/vagrant/.profile", varname: "PATH", varval: "export PATH={{ path }}" }
-    - { file: "/home/vagrant/.bashrc", varname: "GOPATH", varval: "export GOPATH={{ gopath }}" }
-    - { file: "/home/vagrant/.bashrc", varname: "PATH", varval: "export PATH={{ path }}" }
+  with_items: '{{ todd_path_exports }}'
 
 - name: Set up docker repo
   apt_repository:
