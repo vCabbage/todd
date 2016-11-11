@@ -56,7 +56,7 @@ content_type=$(echo $output | sed -n 's/.*Content type: \(.*\) _ENDG.*/\1/p')
 http_connect=$(echo $output | sed -n 's/.*HTTP Connect: \(.*\) _ENDH.*/\1/p')
 num_connects=$(echo $output | sed -n 's/.*Number of Connections: \(.*\) _ENDI.*/\1/p')
 num_redirects=$(echo $output | sed -n 's/.*Number of Redirections: \(.*\) _ENDJ.*/\1/p')
-size_download=$(echo $output | sed -n 's/.*Size of download:: \(.*\) _ENDK.*/\1/p')
+size_download=$(echo $output | sed -n 's/.*Size of download: \(.*\) _ENDK.*/\1/p')
 size_header=$(echo $output | sed -n 's/.*Size of headers: \(.*\) _ENDL.*/\1/p')
 size_request=$(echo $output | sed -n 's/.*Size of request: \(.*\) _ENDM.*/\1/p')
 size_upload=$(echo $output | sed -n 's/.*Size of upload: \(.*\) _ENDN.*/\1/p')
@@ -66,18 +66,9 @@ time_redirect=$(echo $output | sed -n 's/.*Redirect time: \(.*\) _ENDQ.*/\1/p')
 time_starttransfer=$(echo $output | sed -n 's/.*Time to start transfer: \(.*\) _ENDR.*/\1/p')
 url_effective=$(echo $output | sed -n 's/.*Last URL Fetched: \(.*\) _ENDS.*/\1/p')
 
-# TODO You are currently trying to get the HTTP testlet working in the new model. Some of the vars below are causing problems.
-# you need to make sure this works in both unit and integration testing, and then make sure you run "make update_assets", then
-# commit and push those changes.
-# Then you can move into the last task for this issue, which is producing documentation about the testlet standard, specifically that
-# the metrics can be any datatype (it will be passed directly into the TSDB)
-
-
-    # "http_connect":'$http_connect',      # TODO This can output 000, which causes issues
-
-    # "size_download":'$size_download',       # TODO $size_download is empty sometimes
 testlet_data='{
     "http_code":"'$http_code'",
+    "http_connect":"'$http_connect'",
     "time_namelookup":'$time_namelookup',
     "time_connect":'$time_connect',
     "time_pretransfer":'$time_pretransfer',
@@ -88,6 +79,7 @@ testlet_data='{
     "num_redirects":'$num_redirects',
     "size_header":'$size_header',
     "size_request":'$size_request',
+    "size_download":'$size_download',
     "size_upload":'$size_upload',
     "speed_download":'$speed_download',
     "speed_upload":'$speed_upload',
