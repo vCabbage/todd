@@ -72,3 +72,14 @@ A sample JSON object that the "ping" testlet will provide is shown below:
 The JSON document shown above contains the metrics for a single testlet run, which means that this is relevant to only a single target, run by a single ToDD agent. The ToDD agent will receive this output once for each target in the testrun, and submit this entire dataset up to the ToDD server via the ``comms`` system when finished.
 
 The ToDD Server will also aggregate each agent's report to a single metric document for the entire testrun, so that it's easy to see the metrics for each source-to-target relationship for a testrun.
+
+Installing a User-Defined Testlet
+---------------------------------
+
+Installing a user-defined testlet is easy, once you've written it to conform to the standards above. All you need to do is place it in the directory ``/opt/todd/server/assets/testlets`` on the server running ``todd-server``, and ToDD will ensure that the testlet is deployed to the agents.
+
+.. NOTE::
+
+    When ToDD was first released, testlets were all written in bash and packaged with ToDD by embedding them in some clever Go code, and then "unpacked" into this directory. So, you might see some testlets in this directory that you didn't write, like ``iperf``, or ``http``. This is a temporary measure, and will not exist in a future version of ToDD, once those testlets are implemented in Go.
+
+If you want to make changes to these testlets, just overwrite the file in this directory - ToDD will detect those changes and continually make sure the agents are updated.

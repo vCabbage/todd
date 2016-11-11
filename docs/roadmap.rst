@@ -3,7 +3,7 @@ Roadmap
 
 Goals for Alpha Release
 
-* Consistent Error Handling. Need to ensure all packages pass relevant error information up the stack, or handle locally. Also look into https://github.com/toddproject/todd/issues/82
+* Please see https://github.com/toddproject/todd/milestone/1
 
 Goals for Beta Release
 
