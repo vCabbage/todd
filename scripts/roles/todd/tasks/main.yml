@@ -1,6 +1,4 @@
 ---
-- include_vars: toddvars.yml
-
 - name: Set PATH and GOPATH and for Vagrant user and shell profiles
   lineinfile:
     dest: "{{ item.file }}"
