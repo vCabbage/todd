@@ -15,3 +15,16 @@ Please refer to the .travis.yml file in the root of the repository in order to s
 Also, and this is important - the smaller and more single-purpose your PRs are, the better. I am happy to review just about any PR that passes the build and seems to be a good idea, but I do have a day job and if you want a quick turnaround, keep them small!
 
 If you're wondering what there is to work on, I try to keep the [issues for this project](https://github.com/toddproject/todd/issues) populated with any known issues, so feel free to peruse that list.
+
+# Issues / Bug Reports
+
+If you have a QUESTION, please ask on the #todd channel at Network to Code slack channel, or via the todd-developers email list. See [additional resources](https://todd.readthedocs.io/en/latest/resources.html) for info on these communities.
+
+If you are trying to report a bug, or other problems with ToDD, please open a Github issue. When opening an issue, be aware that you're going to be asked for a few things, and it will save you time to just provide them from the beginning:
+
+- Clear, concise explanation of the steps leading up to the problem (a.k.a how can a maintainer reproduce this issue on their own?)
+- ToDD server and agent configuration files
+- ToDD server and agent logs
+
+Generally, the more information you can provide from the beginning, and the clearer it is, the more likely you'll get a quick, useful response. ToDD's used by folks all around the world, and sometimes waiting 12+ hours for a response is bad enough - having to go through the boilerplate discussions just adds to that.
+
