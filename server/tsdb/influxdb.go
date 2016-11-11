@@ -32,7 +32,7 @@ type influxDB struct {
 
 // WriteData will write the resulting testrun data to influxdb as a batch of points - containing
 // important information like metrics and which agent reported them.
-func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData map[string]map[string]map[string]float32) error {
+func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData map[string]map[string]map[string]interface{}) error {
 
 	// Make client
 	c, err := influx.NewHTTPClient(influx.HTTPConfig{

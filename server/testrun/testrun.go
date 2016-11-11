@@ -11,6 +11,7 @@ package testrun
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -313,7 +314,11 @@ finishedloop:
 		log.Fatalf("Error retrieving agent test data: %v", err)
 	}
 
-	clean_data_map := cleanTestData(uncondensedData)
+	clean_data_map, err := cleanTestData(uncondensedData)
+	if err != nil {
+		log.Error("Failed to unmarshal raw test data")
+		os.Exit(1)
+	}
 
 	clean_data_json, err := json.Marshal(clean_data_map)
 	if err != nil {
@@ -327,7 +332,7 @@ finishedloop:
 	time.Sleep(1000 * time.Millisecond)
 
 	if !sourceOverride {
-		testDataMap := make(map[string]map[string]map[string]float32)
+		testDataMap := make(map[string]map[string]map[string]interface{})
 		err = json.Unmarshal(clean_data_json, &testDataMap)
 		if err != nil {
 			panic("Problem converting post-test data to a map")
@@ -336,7 +341,8 @@ finishedloop:
 		var time_db = tsdb.NewToddTSDB(cfg)
 		err = time_db.TSDBPackage.WriteData(testUuid, trObj.Label, trObj.Spec.Source["name"], testDataMap)
 		if err != nil {
-			log.Error("TSDB ERROR - TESTRUN METRICS NOT PUBLISHED")
+			log.Debug(err)
+			log.Error("Problem writing metrics to TSDB")
 		}
 
 	}
@@ -347,42 +353,61 @@ finishedloop:
 
 }
 
-func cleanTestData(dirtyData map[string]string) map[string]map[string]map[string]float32 {
+// cleanTestData cleans up the testing data that comes back from the agents.
+// The test data that comes back raw from the agents is "dirty", meaning it is designed to be as flexible
+// as possible.
+func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[string]interface{}, error) {
 
-	ret_map := make(map[string]map[string]map[string]float32)
+	log.Debug("dirtyData=", fmt.Sprint(dirtyData))
+
+	// retMap is the final map to be returned from this function, that
+	// contains all metrics, for all targets, from all agents
+	retMap := make(map[string]map[string]map[string]interface{})
 
 	for source_uuid, agentData := range dirtyData {
 
-		// Marshal data into a nested map. The keys for the outside map are target IPs,
-		var dataMap map[string]string
-		err := json.Unmarshal([]byte(agentData), &dataMap)
+		fmt.Println(source_uuid)
+
+		// rawMap holds relationships between targets and the raw metrics string associated with them
+		// The metrics string is still "dirty", meaning it still contains things like escape characters, and
+		// needs to be further broken down
+		var rawMap map[string]string
+		err := json.Unmarshal([]byte(agentData), &rawMap)
 		if err != nil {
 			log.Error(err)
-			log.Error(agentData)
-			log.Error("Failed to unmarshal dirty test data 1")
-			os.Exit(1)
+			log.Error(rawMap)
+			return nil, errors.New("Failed to unmarshal raw test data")
 		}
+		log.Debug("rawMap=", fmt.Sprint(rawMap))
 
-		targetMap := make(map[string]map[string]float32)
+		// Once we have cleaned up the metrics data, we need a new home for that data that allows us to
+		// know which target that cleaned up data refers to. targetMap fulfills this purpose
+		targetMap := make(map[string]map[string]interface{})
 
-		fmt.Println(dataMap)
-
-		for target_ip, test_data := range dataMap {
-			var testletMap map[string]float32
-			err := json.Unmarshal([]byte(test_data), &testletMap)
+		// Now that we have our "rawMap", we need to iterate over it, marshal the inner string into it's own
+		// map of metricName:metricValue (metricMap), a
+		for target_ip, test_data := range rawMap {
+			fmt.Println(target_ip)
+			fmt.Println(test_data)
+			var metricMap map[string]interface{}
+			err := json.Unmarshal([]byte(test_data), &metricMap)
 			if err != nil {
 				log.Error(err)
-				log.Error(testletMap)
-				log.Error("Failed to unmarshal dirty test data 2")
-				os.Exit(1)
+				log.Error(metricMap)
+				return nil, errors.New("Failed to clean up inner test data")
 			}
 
-			targetMap[target_ip] = testletMap
+			// Our data is clean, throw it into targetMap
+			targetMap[target_ip] = metricMap
 		}
-		ret_map[source_uuid] = targetMap
+		log.Debug("targetMap=", fmt.Sprint(targetMap))
+
+		// Finally, populate retMap with all of the metrics for this target, and place them under this agent's UUID
+		retMap[source_uuid] = targetMap
 	}
 
-	return ret_map
+	log.Debug("retMap=", fmt.Sprint(retMap))
+	return retMap, nil
 }
 
 // testMonitor offers a basic TCP stream for the ToDD client to subscribe to in order to receive updates during the course of a test.
