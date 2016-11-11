@@ -1,3 +1,4 @@
+---
 docker_repo: 'deb https://apt.dockerproject.org/repo {{ ansible_distribution|lower }}-{{ ansible_distribution_release|lower }} main'
 path: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/home/vagrant/go/bin:/usr/local/go/bin/:/home/vagrant/go/src/github.com/toddproject/todd/scripts
 gopath: /home/vagrant/go
