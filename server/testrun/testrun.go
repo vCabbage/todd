@@ -358,15 +358,13 @@ finishedloop:
 // as possible.
 func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[string]interface{}, error) {
 
-	log.Debug("dirtyData=", fmt.Sprint(dirtyData))
+	log.Debugf("dirtyData=%s", dirtyData)
 
 	// retMap is the final map to be returned from this function, that
 	// contains all metrics, for all targets, from all agents
 	retMap := make(map[string]map[string]map[string]interface{})
 
 	for source_uuid, agentData := range dirtyData {
-
-		fmt.Println(source_uuid)
 
 		// rawMap holds relationships between targets and the raw metrics string associated with them
 		// The metrics string is still "dirty", meaning it still contains things like escape characters, and
@@ -378,7 +376,7 @@ func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[strin
 			log.Error(rawMap)
 			return nil, errors.New("Failed to unmarshal raw test data")
 		}
-		log.Debug("rawMap=", fmt.Sprint(rawMap))
+		log.Debugf("rawMap=%s", rawMap)
 
 		// Once we have cleaned up the metrics data, we need a new home for that data that allows us to
 		// know which target that cleaned up data refers to. targetMap fulfills this purpose
@@ -387,8 +385,6 @@ func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[strin
 		// Now that we have our "rawMap", we need to iterate over it, marshal the inner string into it's own
 		// map of metricName:metricValue (metricMap), a
 		for target_ip, test_data := range rawMap {
-			fmt.Println(target_ip)
-			fmt.Println(test_data)
 			var metricMap map[string]interface{}
 			err := json.Unmarshal([]byte(test_data), &metricMap)
 			if err != nil {
@@ -400,13 +396,13 @@ func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[strin
 			// Our data is clean, throw it into targetMap
 			targetMap[target_ip] = metricMap
 		}
-		log.Debug("targetMap=", fmt.Sprint(targetMap))
+		log.Debugf("targetMap=%s", targetMap)
 
 		// Finally, populate retMap with all of the metrics for this target, and place them under this agent's UUID
 		retMap[source_uuid] = targetMap
 	}
 
-	log.Debug("retMap=", fmt.Sprint(retMap))
+	log.Debugf("retMap=%s", retMap)
 	return retMap, nil
 }
 
