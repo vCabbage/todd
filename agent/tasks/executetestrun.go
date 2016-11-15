@@ -104,8 +104,10 @@ func (ett ExecuteTestRunTask) Run() error {
 					log.Errorf("Failed to kill %s after timeout: %s", testletPath, err)
 				} else {
 					log.Debug("Successfully killed ", testletPath)
-
 				}
+
+				return
+
 			case err := <-done:
 				if err != nil {
 					log.Errorf("Testlet %s completed with error '%s'", testletPath, err)
@@ -115,15 +117,15 @@ func (ett ExecuteTestRunTask) Run() error {
 					// of adding "error" to this map does nothing, as the status is tracked elsewhere
 					// gatheredData[thisTarget] = "error"
 
-				} else {
-					log.Debugf("Testlet %s completed without error", testletPath)
-
-					// Record test data
-					b := json.RawMessage(cmdOutput.Bytes())
-					gatheredData[thisTarget] = &b
+					return
 				}
+				log.Debugf("Testlet %s completed without error", testletPath)
+
 			}
 
+			// Record test data
+			b := json.RawMessage(cmdOutput.Bytes())
+			gatheredData[thisTarget] = &b
 		}()
 	}
 
