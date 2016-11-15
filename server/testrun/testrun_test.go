@@ -24,7 +24,7 @@ func TestCleanData(t *testing.T) {
 
 	_, err := cleanTestData(dirtyData)
 	if err != nil {
-		t.Fatalf(fmt.Sprint(err))
+		t.Errorf(fmt.Sprint(err))
 	}
 
 }
