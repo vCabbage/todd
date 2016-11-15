@@ -40,7 +40,7 @@ func (ett ExecuteTestRunTask) Run() error {
 	// gatheredData represents test data from this agent for all targets.
 	// Key is target name, value is JSON output from testlet for that target
 	// This is reset to a blank map every time ExecuteTestRunTask is called
-	gatheredData := map[string]string{}
+	gatheredData := map[string]*json.RawMessage{}
 
 	// Use a wait group to ensure that all of the testlets have a chance to finish
 	var wg sync.WaitGroup
@@ -104,18 +104,26 @@ func (ett ExecuteTestRunTask) Run() error {
 					log.Errorf("Failed to kill %s after timeout: %s", testletPath, err)
 				} else {
 					log.Debug("Successfully killed ", testletPath)
+
 				}
 			case err := <-done:
 				if err != nil {
 					log.Errorf("Testlet %s completed with error '%s'", testletPath, err)
-					gatheredData[thisTarget] = "error"
+
+					// TODO(mierdin): Handling testrun errors is on my plate as it is, and so
+					// this should get addressed properly in the future. The current approach
+					// of adding "error" to this map does nothing, as the status is tracked elsewhere
+					// gatheredData[thisTarget] = "error"
+
 				} else {
 					log.Debugf("Testlet %s completed without error", testletPath)
+
+					// Record test data
+					b := json.RawMessage(cmdOutput.Bytes())
+					gatheredData[thisTarget] = &b
 				}
 			}
 
-			// Record test data
-			gatheredData[thisTarget] = string(cmdOutput.Bytes())
 		}()
 	}
 
@@ -123,8 +131,9 @@ func (ett ExecuteTestRunTask) Run() error {
 
 	testdata_json, err := json.Marshal(gatheredData)
 	if err != nil {
-		log.Fatal("Failed to marshal post-test data")
-		os.Exit(1)
+		log.Errorf("Failed to marshal post-test data %v", err)
+		// TODO(mierdin): This gets triggered for all iperf servers, because they don't provide metrics.
+		// Need to figure out a more elegant way of handling this (instead of showing this message)
 	}
 
 	// Write test data to agent cache
