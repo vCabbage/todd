@@ -8,7 +8,7 @@ clean:
 	rm -f $(GOPATH)/bin/todd-agent
 
 build:
-	docker build -t mierdin/todd -f Dockerfile .
+	docker build -t toddproject/todd -f Dockerfile .
 
 compile:
 

@@ -11,6 +11,7 @@ package testrun
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -313,7 +314,11 @@ finishedloop:
 		log.Fatalf("Error retrieving agent test data: %v", err)
 	}
 
-	clean_data_map := cleanTestData(uncondensedData)
+	clean_data_map, err := cleanTestData(uncondensedData)
+	if err != nil {
+		log.Error("Failed to unmarshal raw test data")
+		os.Exit(1)
+	}
 
 	clean_data_json, err := json.Marshal(clean_data_map)
 	if err != nil {
@@ -327,7 +332,7 @@ finishedloop:
 	time.Sleep(1000 * time.Millisecond)
 
 	if !sourceOverride {
-		testDataMap := make(map[string]map[string]map[string]float32)
+		testDataMap := make(map[string]map[string]map[string]interface{})
 		err = json.Unmarshal(clean_data_json, &testDataMap)
 		if err != nil {
 			panic("Problem converting post-test data to a map")
@@ -336,7 +341,8 @@ finishedloop:
 		var time_db = tsdb.NewToddTSDB(cfg)
 		err = time_db.TSDBPackage.WriteData(testUuid, trObj.Label, trObj.Spec.Source["name"], testDataMap)
 		if err != nil {
-			log.Error("TSDB ERROR - TESTRUN METRICS NOT PUBLISHED")
+			log.Debug(err)
+			log.Error("Problem writing metrics to TSDB")
 		}
 
 	}
@@ -347,42 +353,23 @@ finishedloop:
 
 }
 
-func cleanTestData(dirtyData map[string]string) map[string]map[string]map[string]float32 {
+// cleanTestData cleans up the testing data that comes back from the agents.
+// The test data that comes back raw from the agents is "dirty", meaning it is designed to be as flexible
+// as possible.
+func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[string]interface{}, error) {
 
-	ret_map := make(map[string]map[string]map[string]float32)
+	retMap := make(map[string]map[string]map[string]interface{})
+	for sourceUUID, agentData := range dirtyData {
+		var agentMap map[string]map[string]interface{}
 
-	for source_uuid, agentData := range dirtyData {
-
-		// Marshal data into a nested map. The keys for the outside map are target IPs,
-		var dataMap map[string]string
-		err := json.Unmarshal([]byte(agentData), &dataMap)
+		err := json.Unmarshal([]byte(agentData), &agentMap)
 		if err != nil {
-			log.Error(err)
-			log.Error(agentData)
-			log.Error("Failed to unmarshal dirty test data 1")
-			os.Exit(1)
+			return nil, errors.New("Failed to unmarshal raw test data")
 		}
-
-		targetMap := make(map[string]map[string]float32)
-
-		fmt.Println(dataMap)
-
-		for target_ip, test_data := range dataMap {
-			var testletMap map[string]float32
-			err := json.Unmarshal([]byte(test_data), &testletMap)
-			if err != nil {
-				log.Error(err)
-				log.Error(testletMap)
-				log.Error("Failed to unmarshal dirty test data 2")
-				os.Exit(1)
-			}
-
-			targetMap[target_ip] = testletMap
-		}
-		ret_map[source_uuid] = targetMap
+		retMap[sourceUUID] = agentMap
 	}
 
-	return ret_map
+	return retMap, nil
 }
 
 // testMonitor offers a basic TCP stream for the ToDD client to subscribe to in order to receive updates during the course of a test.

@@ -56,7 +56,7 @@ content_type=$(echo $output | sed -n 's/.*Content type: \(.*\) _ENDG.*/\1/p')
 http_connect=$(echo $output | sed -n 's/.*HTTP Connect: \(.*\) _ENDH.*/\1/p')
 num_connects=$(echo $output | sed -n 's/.*Number of Connections: \(.*\) _ENDI.*/\1/p')
 num_redirects=$(echo $output | sed -n 's/.*Number of Redirections: \(.*\) _ENDJ.*/\1/p')
-size_download=$(echo $output | sed -n 's/.*Size of download:: \(.*\) _ENDK.*/\1/p')
+size_download=$(echo $output | sed -n 's/.*Size of download: \(.*\) _ENDK.*/\1/p')
 size_header=$(echo $output | sed -n 's/.*Size of headers: \(.*\) _ENDL.*/\1/p')
 size_request=$(echo $output | sed -n 's/.*Size of request: \(.*\) _ENDM.*/\1/p')
 size_upload=$(echo $output | sed -n 's/.*Size of upload: \(.*\) _ENDN.*/\1/p')
@@ -66,25 +66,25 @@ time_redirect=$(echo $output | sed -n 's/.*Redirect time: \(.*\) _ENDQ.*/\1/p')
 time_starttransfer=$(echo $output | sed -n 's/.*Time to start transfer: \(.*\) _ENDR.*/\1/p')
 url_effective=$(echo $output | sed -n 's/.*Last URL Fetched: \(.*\) _ENDS.*/\1/p')
 
-teslet_data='{
+testlet_data='{
     "http_code":"'$http_code'",
-    "time_namelookup":"'$time_namelookup'",
-    "time_connect":"'$time_connect'",
-    "time_pretransfer":"'$time_pretransfer'",
-    "time_starttransfer":"'$time_starttransfer'",
-    "time_total":"'$time_total'",
-    "content_type":"'$content_type'",
     "http_connect":"'$http_connect'",
-    "num_connects":"'$num_connects'",
-    "num_redirects":"'$num_redirects'",
-    "size_download":"'$size_download'",
-    "size_header":"'$size_header'",
-    "size_request":"'$size_request'",
-    "size_upload":"'$size_upload'",
-    "speed_download":"'$speed_download'",
-    "speed_upload":"'$speed_upload'",
-    "time_redirect":"'$time_redirect'",
-    "time_starttransfer":"'$time_starttransfer'",
+    "time_namelookup":'$time_namelookup',
+    "time_connect":'$time_connect',
+    "time_pretransfer":'$time_pretransfer',
+    "time_starttransfer":'$time_starttransfer',
+    "time_total":'$time_total',
+    "content_type":"'$content_type'",
+    "num_connects":'$num_connects',
+    "num_redirects":'$num_redirects',
+    "size_header":'$size_header',
+    "size_request":'$size_request',
+    "size_download":'$size_download',
+    "size_upload":'$size_upload',
+    "speed_download":'$speed_download',
+    "speed_upload":'$speed_upload',
+    "time_redirect":'$time_redirect',
+    "time_starttransfer":'$time_starttransfer',
     "url_effective":"'$url_effective'"
 }'
-echo $teslet_data
+echo $testlet_data

@@ -9,10 +9,16 @@
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-branch="latest"
+branch=$(git symbolic-ref -q HEAD)
+branch=${branch##refs/heads/}
+branch=${branch:-HEAD}
+
 toddimage=toddproject/todd:$branch
 
-alias dtodd='docker run --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network"'
+function dtodd {
+    docker run --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" "$@"
+    sleep 5
+}
 
 # Clean up old containers
 function cleanup {
@@ -92,14 +98,17 @@ function starttodd {
 
 function itsetup {
 
-    # Upload grouping files
-    cat $DIR/../docs/dsl/integration/group-inttest-red.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/group-inttest-blue.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+    yaml_files=( \
+        group-inttest-red.yml \
+        group-inttest-blue.yml \
+        testrun-inttest-iperf.yml \
+        testrun-inttest-ping.yml \
+        testrun-inttest-http.yml \
+    )
 
-    # Upload testrun files
-    cat $DIR/../docs/dsl/integration/testrun-inttest-iperf.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
-    cat $DIR/../docs/dsl/integration/testrun-inttest-ping.yml | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
-    
+    for i in ${yaml_files[@]}; do
+        cat $DIR/../docs/dsl/integration/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+    done
 }
 
 function runintegrationtests {
@@ -120,9 +129,11 @@ function runintegrationtests {
 
     dtodd run inttest-iperf -y -j
 
+    dtodd run inttest-http -y -j
+
 }
 
-if hash docker-machaine 2> /dev/null
+if hash docker-machine 2> /dev/null
 then
     echo "Starting docker machine"
     docker-machine start docker-dev
@@ -147,6 +158,19 @@ cleanup
 
 startinfra
 
+# If any arguments are being passed in, then we want to do a "docker build" locally
+if [ -n "$1" ]
+then
+    echo "Performing 'docker build'..."
+    docker build -t toddproject/todd:$branch -f ../Dockerfile .. > /dev/null
+
+    if [ $? != 0 ]
+    then
+        echo "Failure building Docker image"
+        exit $?
+    fi
+fi
+
 # If first argument is "integration", start that topology and run tests
 if [ "$1" == "integration" ]
 then
@@ -158,20 +182,12 @@ then
 
     runintegrationtests
     exit $?
-fi
-
-# If first argument is "interop", start that demo
-if [ "$1" == "interop" ]
-then
-    sleep 10
-
-    starttodd 3 /etc/todd/server-interop.cfg /etc/todd/agent-interop.cfg
-    exit $?
-fi
-
-# Finally, if something's being passed in, it's probably number of agents, followed by configs.
-if [ -n "$1" ]
-then
+else
+    # If the first argument isn't "integration", then it's probably number of agents, followed by configs.
+    # This can be used to perform load testing in Docker, for instance by using the same configurations as
+    # the integration tests, but with a lot more agents:
+    #
+    # i.e. "./start-containers.sh 30 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg"
     sleep 10
     
     starttodd "$1" "$2" "$3"
