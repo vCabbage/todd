@@ -13,7 +13,7 @@ RUN mkdir -p /opt/todd/agent/assets/testlets
 RUN mkdir -p /opt/todd/server/assets/testlets
 
 RUN apt-get update \
- && apt-get install -y vim curl iperf git
+ && apt-get install -y vim curl iperf git sqlite3
 
 # Install ToDD
 COPY . /go/src/github.com/toddproject/todd

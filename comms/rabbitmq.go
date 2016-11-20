@@ -860,7 +860,9 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 			// Unmarshal into BaseResponse to determine type
 			var base_msg responses.BaseResponse
 			err = json.Unmarshal(d.Body, &base_msg)
-			// TODO(mierdin): Need to handle this error
+			if err != nil {
+				log.Error("Problem unmarshalling baseresponse")
+			}
 
 			log.Debugf("Agent response received: %s", d.Body)
 
@@ -870,7 +872,9 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 
 				var sasr responses.SetAgentStatusResponse
 				err = json.Unmarshal(d.Body, &sasr)
-				// TODO(mierdin): Need to handle this error
+				if err != nil {
+					log.Error("Problem unmarshalling AgentStatus")
+				}
 
 				log.Debugf("Agent %s is '%s' regarding test %s. Writing to DB.", sasr.AgentUuid, sasr.Status, sasr.TestUuid)
 				err := tdb.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status)
@@ -882,10 +886,14 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 
 				var utdr responses.UploadTestDataResponse
 				err = json.Unmarshal(d.Body, &utdr)
-				// TODO(mierdin): Need to handle this error
+				if err != nil {
+					log.Error("Problem unmarshalling UploadTestDataResponse")
+				}
 
 				err = tdb.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
-				// TODO(mierdin): Need to handle this error
+				if err != nil {
+					log.Error("Problem setting agent test data")
+				}
 
 				// Send task to the agent that says to delete the entry
 				var dtdt tasks.DeleteTestDataTask
