@@ -258,7 +258,6 @@ readyloop:
 					//...and it's also in our target group, add it to our targets map
 					if val == trObj.Spec.Target.(map[string]interface{})["name"].(string) {
 						targetStatuses[agent] = status
-						log.Error(agent)
 					}
 				}
 			}
