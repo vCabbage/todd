@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -81,6 +82,7 @@ func (ett ExecuteTestRunTask) Run() error {
 
 			log.Debugf("Full testlet command and args: '%s %s %s'", testletPath, thisTarget, tr.Args)
 			cmd := exec.Command(testletPath, thisTarget, tr.Args)
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 			// Stdout buffer
 			cmdOutput := &bytes.Buffer{}
@@ -100,7 +102,8 @@ func (ett ExecuteTestRunTask) Run() error {
 			// - The configured time limit is exceeded (expected for testlets running in server mode)
 			select {
 			case <-time.After(time.Duration(ett.TimeLimit) * time.Second):
-				if err := cmd.Process.Kill(); err != nil {
+
+				if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
 					log.Errorf("Failed to kill %s after timeout: %s", testletPath, err)
 				} else {
 					log.Debug("Successfully killed ", testletPath)
