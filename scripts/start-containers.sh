@@ -127,9 +127,13 @@ function runintegrationtests {
 
     dtodd run inttest-ping -y -j
 
+    dtodd run inttest-http -y -j
+
+    # Running the iperf test twice to ensure the server side is properly cleaned up
+    dtodd run inttest-iperf -y -j
     dtodd run inttest-iperf -y -j
 
-    dtodd run inttest-http -y -j
+
 
 }
 
