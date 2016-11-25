@@ -22,7 +22,7 @@ import (
 )
 
 // Run is responsible for activating an existing testrun object
-func (capi ClientApi) Run(conf map[string]string, testrunName string, displayReport, skipConfirm bool) error {
+func (capi ClientAPI) Run(conf map[string]string, testrunName string, displayReport, skipConfirm bool) error {
 
 	sourceGroup := conf["sourceGroup"]
 	sourceApp := conf["sourceApp"]
@@ -89,11 +89,11 @@ func (capi ClientApi) Run(conf map[string]string, testrunName string, displayRep
 
 	switch string(serverResponse) {
 	case "notfound":
-		return errors.New("ERROR - Specified testrun object not found.")
+		return errors.New("ERROR - Specified testrun object not found")
 	case "invalidtopology":
 		return errors.New("ERROR - Not enough agents are in the groups specified by the testrun")
 	case "failure":
-		return errors.New("ERROR - some kind of error was encountered on the server. Test was not run.")
+		return errors.New("ERROR - some kind of error was encountered on the server. Test was not run")
 	}
 
 	testUUID := string(serverResponse)

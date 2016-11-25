@@ -28,7 +28,7 @@ type AgentRegistry struct {
 
 // AgentAdvert is a struct for an Agent advertisement
 type AgentAdvert struct {
-	Uuid           string              `json:"Uuid"`
+	UUID           string              `json:"Uuid"`
 	DefaultAddr    string              `json:"DefaultAddr"`
 	Expires        time.Duration       `json:"Expires"`
 	LocalTime      time.Time           `json:"LocalTime"`
@@ -42,7 +42,7 @@ func (a AgentAdvert) FactSummary() string {
 
 	var keys []string
 
-	for k, _ := range a.Facts {
+	for k := range a.Facts {
 		keys = append(keys, k)
 	}
 
@@ -66,7 +66,7 @@ func (a AgentAdvert) CollectorSummary() string {
 
 	var keys []string
 
-	for k, _ := range a.FactCollectors {
+	for k := range a.FactCollectors {
 		keys = append(keys, k)
 	}
 
@@ -90,7 +90,7 @@ func (a AgentAdvert) TestletSummary() string {
 
 	var keys []string
 
-	for k, _ := range a.Testlets {
+	for k := range a.Testlets {
 		keys = append(keys, k)
 	}
 
@@ -108,7 +108,7 @@ func (a AgentAdvert) TestletSummary() string {
 	return buffer.String()
 }
 
-// JsonPP pretty-prints the facts for an agent
+// PPFacts pretty-prints the facts for an agent
 func (a AgentAdvert) PPFacts() string {
 	retjson, err := json.MarshalIndent(a.Facts, "", "    ")
 	if err != nil {

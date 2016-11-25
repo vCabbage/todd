@@ -11,6 +11,6 @@ package responses
 // SetAgentStatusResponse defines this particular response.
 type SetAgentStatusResponse struct {
 	BaseResponse
-	TestUuid string `json:"TestUuid"`
+	TestUUID string `json:"TestUuid"`
 	Status   string `json:"status"`
 }

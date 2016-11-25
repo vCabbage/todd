@@ -24,11 +24,10 @@ import (
 )
 
 var (
-	todd_version = "0.0.1"
+	toddVersion = "0.0.1"
+	// Command-line Arguments
+	argVersion string
 )
-
-// Command-line Arguments
-var arg_config string
 
 func init() {
 
@@ -43,7 +42,7 @@ func init() {
 		os.Exit(0)
 	}
 
-	flag.StringVar(&arg_config, "config", "/etc/todd/server.cfg", "ToDD server config file location")
+	flag.StringVar(&argVersion, "config", "/etc/todd/server.cfg", "ToDD server config file location")
 	flag.Parse()
 
 	// TODO(moswalt): Implement configurable loglevel in server and agent
@@ -52,7 +51,7 @@ func init() {
 
 func main() {
 
-	cfg, err := config.GetConfig(arg_config)
+	cfg, err := config.GetConfig(argVersion)
 	if err != nil {
 		log.Fatalf("Problem getting configuration: %v\n", err)
 	}
@@ -84,7 +83,7 @@ func main() {
 
 	go func() {
 		for {
-			err := tc.CommsPackage.ListenForAgent(assets)
+			err := tc.Package.ListenForAgent(assets)
 			if err != nil {
 				log.Fatalf("Error listening for ToDD Agents")
 			}
@@ -100,10 +99,10 @@ func main() {
 		}
 	}()
 
-	log.Infof("ToDD server v%s. Press any key to exit...\n", todd_version)
+	log.Infof("ToDD server v%s. Press any key to exit...\n", toddVersion)
 
 	// Sssh, sssh, only dreams now....
 	for {
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 10) // TODO: Replace with select{}, blocks forever without interrupt
 	}
 }

@@ -18,7 +18,7 @@ import (
 
 func main() {
 
-	var clientapi capi.ClientApi
+	var clientAPI capi.ClientAPI
 
 	app := cli.NewApp()
 	app.Name = "todd"
@@ -51,7 +51,7 @@ func main() {
 			Name:  "agents",
 			Usage: "Show ToDD agent information",
 			Action: func(c *cli.Context) {
-				agents, err := clientapi.Agents(
+				agents, err := clientAPI.Agents(
 					map[string]string{
 						"host": host,
 						"port": port,
@@ -62,7 +62,7 @@ func main() {
 					fmt.Println(err)
 					os.Exit(1)
 				}
-				err = clientapi.DisplayAgents(agents, !(c.Args().Get(0) == ""))
+				err = clientAPI.DisplayAgents(agents, !(c.Args().Get(0) == ""))
 				if err != nil {
 					fmt.Println("Problem displaying agents (client-side)")
 				}
@@ -75,7 +75,7 @@ func main() {
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
 
-				err := clientapi.Create(
+				err := clientAPI.Create(
 					map[string]string{
 						"host": host,
 						"port": port,
@@ -94,7 +94,7 @@ func main() {
 			Name:  "delete",
 			Usage: "Delete ToDD object",
 			Action: func(c *cli.Context) {
-				err := clientapi.Delete(
+				err := clientAPI.Delete(
 					map[string]string{
 						"host": host,
 						"port": port,
@@ -115,7 +115,7 @@ func main() {
 			Name:  "groups",
 			Usage: "Show current agent-to-group mappings",
 			Action: func(c *cli.Context) {
-				err := clientapi.Groups(
+				err := clientAPI.Groups(
 					map[string]string{
 						"host": host,
 						"port": port,
@@ -133,7 +133,7 @@ func main() {
 			Name:  "objects",
 			Usage: "Show information about installed group objects",
 			Action: func(c *cli.Context) {
-				err := clientapi.Objects(
+				err := clientAPI.Objects(
 					map[string]string{
 						"host": host,
 						"port": port,
@@ -174,7 +174,7 @@ func main() {
 			},
 			Usage: "Execute an already uploaded testrun object",
 			Action: func(c *cli.Context) {
-				err := clientapi.Run(
+				err := clientAPI.Run(
 					map[string]string{
 						"host":        host,
 						"port":        port,

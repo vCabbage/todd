@@ -29,8 +29,8 @@ func GetFacts(cfg config.Config) map[string][]string {
 	retFactSet := make(map[string][]string)
 
 	// this is the function that will do work on a single file during a walk
-	execute_collector := func(path string, f os.FileInfo, err error) error {
-		if f.IsDir() != true {
+	executeCollector := func(path string, f os.FileInfo, err error) error {
+		if !f.IsDir() {
 			cmd := exec.Command(path)
 
 			// Stdout buffer
@@ -46,6 +46,9 @@ func GetFacts(cfg config.Config) map[string][]string {
 
 			// Unmarshal JSON into our fact map
 			err = json.Unmarshal(cmdOutput.Bytes(), &fact)
+			if err != nil {
+				return err
+			}
 
 			// We only expect a single key in the returned fact map. Only add to fact map if this is true.
 			if len(fact) == 1 {
@@ -59,7 +62,7 @@ func GetFacts(cfg config.Config) map[string][]string {
 	}
 
 	// Perform above Walk function (execute_collector) on the collector directory
-	err := filepath.Walk(fmt.Sprintf("%s/assets/factcollectors", cfg.LocalResources.OptDir), execute_collector)
+	err := filepath.Walk(fmt.Sprintf("%s/assets/factcollectors", cfg.LocalResources.OptDir), executeCollector)
 	if err != nil {
 		log.Error("Problem running fact-gathering collector")
 	}

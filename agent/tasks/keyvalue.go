@@ -9,7 +9,6 @@
 package tasks
 
 import (
-	"errors"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
@@ -34,9 +33,9 @@ func (kvt KeyValueTask) Run() error {
 
 	err := ac.SetKeyValue(kvt.Key, kvt.Value)
 	if err != nil {
-		return errors.New(fmt.Sprintf("KeyValueTask failed - %s:%s", kvt.Key, kvt.Value))
+		return fmt.Errorf("KeyValueTask failed - %s:%s", kvt.Key, kvt.Value)
 	}
-	log.Info(fmt.Sprintf("KeyValueTask successful - %s:%s", kvt.Key, kvt.Value))
+	log.Infof("KeyValueTask successful - %s:%s", kvt.Key, kvt.Value)
 
 	return nil
 }

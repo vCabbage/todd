@@ -47,8 +47,8 @@ func (tapi ToDDApi) Start(cfg config.Config) error {
 	http.HandleFunc("/v1/testrun/run", tapi.Run)
 	http.HandleFunc("/v1/testdata", tapi.TestData)
 
-	serve_url := fmt.Sprintf("%s:%s", tapi.cfg.API.Host, tapi.cfg.API.Port)
+	serveURL := fmt.Sprintf("%s:%s", tapi.cfg.API.Host, tapi.cfg.API.Port)
 
-	log.Infof("Serving ToDD Server API at: %s\n", serve_url)
-	return http.ListenAndServe(serve_url, nil)
+	log.Infof("Serving ToDD Server API at: %s\n", serveURL)
+	return http.ListenAndServe(serveURL, nil)
 }

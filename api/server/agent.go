@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+
 	"github.com/toddproject/todd/agent/defs"
 )
 
@@ -31,7 +32,7 @@ func (tapi ToDDApi) Agent(w http.ResponseWriter, r *http.Request) {
 	if uuid := r.URL.Query().Get("uuid"); uuid != "" {
 		// Let's use the full list so we can identify the right agent if the user specified a short
 		for i := range agentList {
-			if strings.HasPrefix(agentList[i].Uuid, uuid) {
+			if strings.HasPrefix(agentList[i].UUID, uuid) {
 				// Replace agentList with first match and break
 				agentList = []defs.AgentAdvert{agentList[i]}
 				break

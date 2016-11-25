@@ -9,9 +9,8 @@
 package cache
 
 import (
-	"fmt"
-
 	"database/sql"
+	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3" // This look strange but is necessary - the sqlite package is used indirectly by database/sql
@@ -20,7 +19,7 @@ import (
 // GetKeyValue will retrieve a value from the agent cache using a key string
 func (ac AgentCache) GetKeyValue(key string) string {
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +44,7 @@ func (ac AgentCache) GetKeyValue(key string) string {
 func (ac AgentCache) SetKeyValue(key, value string) error {
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -20,7 +20,7 @@ import (
 )
 
 // Groups will query ToDD for a map containing current agent-to-group mappings
-func (capi ClientApi) Groups(conf map[string]string) error {
+func (capi ClientAPI) Groups(conf map[string]string) error {
 
 	url := fmt.Sprintf("http://%s:%s/v1/groups", conf["host"], conf["port"])
 
@@ -58,12 +58,12 @@ func (capi ClientApi) Groups(conf map[string]string) error {
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
 	fmt.Fprintln(w, "UUID\tGROUP NAME")
 
-	for agent_uuid, group_name := range groupmap {
+	for agentUUID, groupName := range groupmap {
 		fmt.Fprintf(
 			w,
 			"%s\t%s\n",
-			hostresources.TruncateID(agent_uuid),
-			group_name,
+			hostresources.TruncateID(agentUUID),
+			groupName,
 		)
 	}
 	fmt.Fprintln(w)
