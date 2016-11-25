@@ -21,8 +21,8 @@ func GetFileSHA256(filename string) string {
 	hasher := sha256.New()
 	s, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Error("Error generating hash for file %s", filename)
-		panic(fmt.Sprintf("Error generating hash for file %s", filename))
+		log.Errorf("Error generating hash for file %s", filename)
+		panic(fmt.Sprintf("Error generating hash for file %s", filename)) // TODO: Use log.Panicf?
 	}
 	hasher.Write(s)
 

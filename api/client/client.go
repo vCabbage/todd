@@ -8,4 +8,4 @@
 
 package api
 
-type ClientApi struct{}
+type ClientAPI struct{}

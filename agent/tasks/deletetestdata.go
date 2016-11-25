@@ -9,7 +9,6 @@
 package tasks
 
 import (
-	"errors"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
@@ -23,7 +22,7 @@ import (
 type DeleteTestDataTask struct {
 	BaseTask
 	Config   config.Config `json:"-"`
-	TestUuid string        `json:"key"`
+	TestUUID string        `json:"key"`
 }
 
 // Run contains the logic necessary to perform this task on the agent.
@@ -31,11 +30,11 @@ func (dtdt DeleteTestDataTask) Run() error {
 
 	var ac = cache.NewAgentCache(dtdt.Config)
 
-	err := ac.DeleteTestRun(dtdt.TestUuid)
+	err := ac.DeleteTestRun(dtdt.TestUUID)
 	if err != nil {
-		return errors.New(fmt.Sprintf("DeleteTestDataTask failed - %s", dtdt.TestUuid))
+		return fmt.Errorf("DeleteTestDataTask failed - %s", dtdt.TestUUID)
 	}
-	log.Info(fmt.Sprintf("DeleteTestDataTask successful - %s", dtdt.TestUuid))
+	log.Infof("DeleteTestDataTask successful - %s", dtdt.TestUUID)
 
 	return nil
 }

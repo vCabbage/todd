@@ -22,24 +22,22 @@ import (
 // GetLocalAssets gathers all currently installed assets, and generates a map of their names and hashes.
 func GetLocalAssets(cfg config.Config) map[string]map[string]string {
 
-	asset_types := []string{
+	assetTypes := []string{
 		"factcollectors",
 		"testlets",
 	}
 
-	final_return_assets := make(map[string]map[string]string)
+	finalReturnAssets := make(map[string]map[string]string)
 
-	for i := range asset_types {
-		found_assets := make(map[string]string)
-
-		thisType := asset_types[i]
+	for _, thisType := range assetTypes {
+		foundAssets := make(map[string]string)
 
 		// this is the function that will generate a hash for a file and add it to our asset map
-		discover_assets := func(path string, f os.FileInfo, err error) error {
+		discoverAssets := func(path string, f os.FileInfo, err error) error {
 
-			if f.IsDir() != true {
+			if !f.IsDir() {
 				// Generate hash
-				found_assets[f.Name()] = hostresources.GetFileSHA256(path)
+				foundAssets[f.Name()] = hostresources.GetFileSHA256(path)
 				log.Debugf("Asset found locally: %s (with hash %s)", f.Name(), hostresources.GetFileSHA256(path))
 			}
 			return nil
@@ -56,17 +54,17 @@ func GetLocalAssets(cfg config.Config) map[string]map[string]string {
 		}
 
 		// Perform above Walk function (discover_assets) on the collector directory
-		err = filepath.Walk(thisAssetDir, discover_assets)
+		err = filepath.Walk(thisAssetDir, discoverAssets)
 		if err != nil {
 			log.Error("Problem getting assets")
 			os.Exit(1)
 		}
 
-		final_return_assets[thisType] = found_assets
+		finalReturnAssets[thisType] = foundAssets
 
 	}
 
 	// Return collectors so that the calling function can pass this to the registry for enforcement
-	return final_return_assets
+	return finalReturnAssets
 
 }

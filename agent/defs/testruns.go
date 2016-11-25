@@ -12,7 +12,7 @@ package defs
 // Here, the "targets" property is a string slice - which means that the target type and targets have already been calculated by the server.
 // This struct is sent to a specific agent so that it has the instructions it needs to perform a test.
 type TestRun struct {
-	Uuid    string   `json:"uuid"`
+	UUID    string   `json:"uuid"`
 	Targets []string `json:"targets"`
 	Testlet string   `json:"testlet"`
 	Args    string   `json:"args"`

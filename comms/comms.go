@@ -25,10 +25,10 @@ type assetProvider interface {
 	Assets() map[string]map[string]string
 }
 
-// CommsPackage will ensure that whatever specific comms struct is loaded at compile time will support
+// Package will ensure that whatever specific comms struct is loaded at compile time will support
 // all of the necessary features/functions that we need to make ToDD work. In short, this interface
 // represents a list of things that the server and agents do on the message queue.
-type CommsPackage interface {
+type Package interface {
 
 	// TODO(mierdin) best way to document interface or function args? I've tried to document
 	// them minimally below, but would like a better way to document the meaning behind
@@ -57,19 +57,19 @@ type CommsPackage interface {
 
 // toddComms is a struct to hold anything that satisfies the CommsPackage interface
 type toddComms struct {
-	CommsPackage
+	Package
 }
 
 // NewToDDComms will create a new instance of toddComms, and load the desired
 // CommsPackage-compatible comms package into it.
-func NewToDDComms(cfg config.Config) (*toddComms, error) {
+func NewToDDComms(cfg config.Config) (*toddComms, error) { // TODO: Return Package instead of *struct embedding Package
 
 	var tc toddComms
 
 	// Load the appropriate comms package based on config file
 	switch cfg.Comms.Plugin {
 	case "rabbitmq":
-		tc.CommsPackage = newRabbitMQComms(cfg)
+		tc.Package = newRabbitMQComms(cfg)
 	default:
 		log.Error("Invalid comms plugin in config file")
 		return nil, errors.New("Invalid comms plugin in config file")

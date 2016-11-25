@@ -32,13 +32,13 @@ import (
 
 func NewAgentCache(cfg config.Config) *AgentCache {
 	var ac AgentCache
-	ac.db_loc = fmt.Sprintf("%s/agent_cache.db", cfg.LocalResources.OptDir)
+	ac.dbLoc = fmt.Sprintf("%s/agent_cache.db", cfg.LocalResources.OptDir)
 	return &ac
 }
 
 type AgentCache struct {
 	// Need similar abstractions to what you did in the tasks package
-	db_loc string
+	dbLoc string
 }
 
 // TODO(mierdin): Handling errors in this package?
@@ -47,10 +47,10 @@ type AgentCache struct {
 func (ac AgentCache) Init() {
 
 	// Clean up any old cache data
-	os.Remove(ac.db_loc)
+	os.Remove(ac.dbLoc)
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Fatal(err)
 	}

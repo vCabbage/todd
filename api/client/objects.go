@@ -21,7 +21,7 @@ import (
 
 // Objects will query ToDD for all objects, with the type requested in the sub-arguments, and then display a list of those
 // objects to the user.
-func (capi ClientApi) Objects(conf map[string]string, objType string) error {
+func (capi ClientAPI) Objects(conf map[string]string, objType string) error {
 
 	// If no subarg was provided, instruct the user to provide the object type
 	if objType == "" {
@@ -51,7 +51,7 @@ func (capi ClientApi) Objects(conf map[string]string, objType string) error {
 		return err
 	}
 
-	parsed_objects := objects.ParseToddObjects(body)
+	parsedObjects := objects.ParseToddObjects(body)
 
 	w := new(tabwriter.Writer)
 
@@ -59,14 +59,14 @@ func (capi ClientApi) Objects(conf map[string]string, objType string) error {
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
 	fmt.Fprintln(w, "LABEL\tTYPE\tSPEC\t")
 
-	for i := range parsed_objects {
+	for i := range parsedObjects {
 
 		fmt.Fprintf(
 			w,
 			"%s\t%s\t%s\n",
-			parsed_objects[i].GetLabel(),
-			parsed_objects[i].GetType(),
-			parsed_objects[i].GetSpec(),
+			parsedObjects[i].GetLabel(),
+			parsedObjects[i].GetType(),
+			parsedObjects[i].GetSpec(),
 		)
 	}
 	fmt.Fprintln(w)

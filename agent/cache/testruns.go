@@ -24,7 +24,7 @@ import (
 func (ac AgentCache) InsertTestRun(tr defs.TestRun) error {
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Error accessing sqlite cache")
@@ -45,18 +45,18 @@ func (ac AgentCache) InsertTestRun(tr defs.TestRun) error {
 	defer stmt.Close()
 
 	// Marshal our string slices to be stored in the database
-	json_targets, err := json.Marshal(tr.Targets)
+	jsonTargets, err := json.Marshal(tr.Targets)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Error marshaling testrun data into JSON")
 	}
-	json_args, err := json.Marshal(tr.Args)
+	jsonArgs, err := json.Marshal(tr.Args)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Error marshaling testrun data into JSON")
 	}
 
-	_, err = stmt.Exec(tr.Uuid, tr.Testlet, string(json_args), string(json_targets))
+	_, err = stmt.Exec(tr.UUID, tr.Testlet, string(jsonArgs), string(jsonTargets))
 	if err != nil {
 		log.Error(err)
 		return errors.New("Error executing new testrun insert")
@@ -64,7 +64,7 @@ func (ac AgentCache) InsertTestRun(tr defs.TestRun) error {
 
 	tx.Commit()
 
-	log.Info("Inserted new testrun into agent cache - ", tr.Uuid)
+	log.Info("Inserted new testrun into agent cache - ", tr.UUID)
 
 	return nil
 }
@@ -75,7 +75,7 @@ func (ac AgentCache) GetTestRun(uuid string) (defs.TestRun, error) {
 	var tr defs.TestRun
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Error(err)
 		return tr, errors.New("Error accessing sqlite cache")
@@ -92,24 +92,24 @@ func (ac AgentCache) GetTestRun(uuid string) (defs.TestRun, error) {
 	for rows.Next() {
 
 		// TODO(mierdin): This may be unnecessary - rows.Scan() might allow you to pass this in as a byteslice. Experiment with this
-		var args_json, targets_json string
+		var argsJSON, targetsJSON string
 
-		rows.Scan(&tr.Testlet, &args_json, &targets_json)
-		err = json.Unmarshal([]byte(args_json), &tr.Args)
+		rows.Scan(&tr.Testlet, &argsJSON, &targetsJSON)
+		err = json.Unmarshal([]byte(argsJSON), &tr.Args)
 		if err != nil {
 			log.Error(err)
 			return tr, errors.New("Error unmarshaling testrun data from JSON")
 		}
-		err = json.Unmarshal([]byte(targets_json), &tr.Targets)
+		err = json.Unmarshal([]byte(targetsJSON), &tr.Targets)
 		if err != nil {
 			log.Error(err)
 			return tr, errors.New("Error unmarshaling testrun data from JSON")
 		}
 	}
 
-	tr.Uuid = uuid
+	tr.UUID = uuid
 
-	log.Info("Found testrun ", tr.Uuid, " running testlet ", tr.Testlet)
+	log.Info("Found testrun ", tr.UUID, " running testlet ", tr.Testlet)
 
 	return tr, nil
 }
@@ -119,7 +119,7 @@ func (ac AgentCache) GetTestRun(uuid string) (defs.TestRun, error) {
 func (ac AgentCache) UpdateTestRunData(uuid string, testData string) error {
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Error accessing sqlite cache for testrun update")
@@ -155,7 +155,7 @@ func (ac AgentCache) UpdateTestRunData(uuid string, testData string) error {
 func (ac AgentCache) DeleteTestRun(uuid string) error {
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Error accessing sqlite cache for DeleteTestRun")
@@ -193,7 +193,7 @@ func (ac AgentCache) GetFinishedTestRuns() (map[string]string, error) {
 	retmap := make(map[string]string)
 
 	// Open connection
-	db, err := sql.Open("sqlite3", ac.db_loc)
+	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
 		log.Error(err)
 		return retmap, errors.New("Error accessing sqlite cache for finished testruns")

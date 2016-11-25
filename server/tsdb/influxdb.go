@@ -32,7 +32,7 @@ type influxDB struct {
 
 // WriteData will write the resulting testrun data to influxdb as a batch of points - containing
 // important information like metrics and which agent reported them.
-func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData map[string]map[string]map[string]interface{}) error {
+func (ifdb influxDB) WriteData(testUUID, testRunName, groupName string, testData map[string]map[string]map[string]interface{}) error {
 
 	// Make client
 	c, err := influx.NewHTTPClient(influx.HTTPConfig{
@@ -55,17 +55,17 @@ func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData
 	}
 
 	// Need to publish data from all of the agents that took part in this test
-	for agentUuid, agentData := range testData {
+	for agentUUID, agentData := range testData {
 
 		// Also need to differentiate between the various target that these agents tested against
 		for targetAddress, metrics := range agentData {
 
 			// Create a point and add to batch
 			tags := map[string]string{
-				"agent":       agentUuid,
+				"agent":       agentUUID,
 				"target":      targetAddress,
 				"sourceGroup": groupName,
-				"testUuid":    testUuid,
+				"testUuid":    testUUID,
 			}
 
 			// Insert into influx fields
@@ -91,7 +91,7 @@ func (ifdb influxDB) WriteData(testUuid, testRunName, groupName string, testData
 		return err
 	}
 
-	log.Infof("Wrote test data for %s to influxdb", testUuid)
+	log.Infof("Wrote test data for %s to influxdb", testUUID)
 
 	return nil
 }

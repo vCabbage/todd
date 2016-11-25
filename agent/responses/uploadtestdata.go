@@ -11,6 +11,6 @@ package responses
 // UploadTestDataResponse defines this particular response.
 type UploadTestDataResponse struct {
 	BaseResponse
-	TestUuid string `json:"TestUuid"`
+	TestUUID string `json:"TestUuid"`
 	TestData string `json:"status"`
 }

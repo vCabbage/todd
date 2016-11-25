@@ -24,14 +24,14 @@ import (
 // Agents will query the ToDD server for a list of currently registered agents, and will display
 // a list of them to the user. Optionally, the user can provide a subargument containing the UUID of
 // a registered agent, and this function will output more detailed information about that agent.
-func (capi ClientApi) Agents(conf map[string]string, agentUuid string) ([]defs.AgentAdvert, error) {
+func (capi ClientAPI) Agents(conf map[string]string, agentUUID string) ([]defs.AgentAdvert, error) {
 
 	var agents []defs.AgentAdvert
 
 	var url string
 
-	if agentUuid != "" {
-		url = fmt.Sprintf("http://%s:%s/v1/agent?uuid=%s", conf["host"], conf["port"], agentUuid)
+	if agentUUID != "" {
+		url = fmt.Sprintf("http://%s:%s/v1/agent?uuid=%s", conf["host"], conf["port"], agentUUID)
 	} else {
 		url = fmt.Sprintf("http://%s:%s/v1/agent", conf["host"], conf["port"])
 	}
@@ -59,31 +59,27 @@ func (capi ClientApi) Agents(conf map[string]string, agentUuid string) ([]defs.A
 
 	// Marshal API data into object
 	err = json.Unmarshal(body, &agents)
-	if err != nil {
-		return agents, err
-	}
-
-	return agents, nil
+	return agents, err
 }
 
 // DisplayAgents is responsible for displaying a set of Agents to the terminal
-func (capi ClientApi) DisplayAgents(agents []defs.AgentAdvert, detail bool) error {
+func (capi ClientAPI) DisplayAgents(agents []defs.AgentAdvert, detail bool) error {
 
 	if len(agents) == 0 {
 		fmt.Println("No agents found.")
 		return nil
-	} else {
-		if agents[0].Uuid == "" {
-			fmt.Println("No agents found.")
-			return nil
-		}
+	}
+
+	if agents[0].UUID == "" {
+		fmt.Println("No agents found.")
+		return nil
 	}
 
 	if detail {
 
 		// TODO(moswalt): if nothing found, API should return either null or empty slice, and client should handle this
 		tmpl, err := template.New("test").Parse(
-			`Agent UUID:  {{.Uuid}}
+			`Agent UUID:  {{.UUID}}
 Expires:  {{.Expires}}
 Collector Summary: {{.CollectorSummary}}
 Facts:
@@ -112,7 +108,7 @@ Facts:
 			fmt.Fprintf(
 				w,
 				"%s\t%s\t%s\t%s\t%s\n",
-				hostresources.TruncateID(agents[i].Uuid),
+				hostresources.TruncateID(agents[i].UUID),
 				agents[i].Expires,
 				agents[i].DefaultAddr,
 				agents[i].FactSummary(),

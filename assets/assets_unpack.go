@@ -203,10 +203,10 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"testing/bashtestlets/http": testingBashtestletsHttp,
-	"testing/bashtestlets/iperf": testingBashtestletsIperf,
+	"testing/bashtestlets/http":      testingBashtestletsHttp,
+	"testing/bashtestlets/iperf":     testingBashtestletsIperf,
 	"facts/collectors/get_addresses": factsCollectorsGet_addresses,
-	"facts/collectors/get_hostname": factsCollectorsGet_hostname,
+	"facts/collectors/get_hostname":  factsCollectorsGet_hostname,
 }
 
 // AssetDir returns the file names below a certain
@@ -248,16 +248,17 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"facts": &bintree{nil, map[string]*bintree{
 		"collectors": &bintree{nil, map[string]*bintree{
 			"get_addresses": &bintree{factsCollectorsGet_addresses, map[string]*bintree{}},
-			"get_hostname": &bintree{factsCollectorsGet_hostname, map[string]*bintree{}},
+			"get_hostname":  &bintree{factsCollectorsGet_hostname, map[string]*bintree{}},
 		}},
 	}},
 	"testing": &bintree{nil, map[string]*bintree{
 		"bashtestlets": &bintree{nil, map[string]*bintree{
-			"http": &bintree{testingBashtestletsHttp, map[string]*bintree{}},
+			"http":  &bintree{testingBashtestletsHttp, map[string]*bintree{}},
 			"iperf": &bintree{testingBashtestletsIperf, map[string]*bintree{}},
 		}},
 	}},
@@ -309,4 +310,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-

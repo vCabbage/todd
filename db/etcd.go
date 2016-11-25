@@ -68,7 +68,7 @@ func (etcddb *etcdDB) Init() error {
 // SetAgent will ingest an agent advertisement, and update or insert the agent record
 // in the database as needed.
 func (etcddb *etcdDB) SetAgent(adv defs.AgentAdvert) error {
-	log.Infof("Setting '/todd/agents/%s' key", adv.Uuid)
+	log.Infof("Setting '/todd/agents/%s' key", adv.UUID)
 
 	advJSON, err := json.Marshal(adv)
 	if err != nil {
@@ -79,7 +79,7 @@ func (etcddb *etcdDB) SetAgent(adv defs.AgentAdvert) error {
 	// TODO(mierdin): TTL needs to be user-configurable
 	resp, err := etcddb.keysAPI.Set(
 		context.Background(),                      // context
-		fmt.Sprintf("/todd/agents/%s", adv.Uuid),  // key
+		fmt.Sprintf("/todd/agents/%s", adv.UUID),  // key
 		string(advJSON),                           // value
 		&client.SetOptions{TTL: time.Second * 30}, //optional args
 	)
@@ -130,7 +130,7 @@ func nodeToAgentAdvert(node *client.Node, expectedUUID string) (*defs.AgentAdver
 	adv.Expires = node.TTLDuration()
 
 	// The etcd key should always match the inner JSON
-	if expectedUUID != adv.Uuid {
+	if expectedUUID != adv.UUID {
 		return nil, errors.New("UUID in etcd does not match inner JSON text")
 	}
 
@@ -179,12 +179,12 @@ func (etcddb *etcdDB) GetAgents() ([]defs.AgentAdvert, error) {
 // RemoveAgent will delete an agent advertisement present in etcd. This function exists for the rare situation when
 // an Agent needs to be removed immediately, as opposed to simply waiting for the TTL to expire.
 func (etcddb *etcdDB) RemoveAgent(adv defs.AgentAdvert) error {
-	_, err := etcddb.keysAPI.Delete(context.Background(), fmt.Sprintf("/todd/agents/%s", adv.Uuid), &client.DeleteOptions{Recursive: true, Dir: true})
+	_, err := etcddb.keysAPI.Delete(context.Background(), fmt.Sprintf("/todd/agents/%s", adv.UUID), &client.DeleteOptions{Recursive: true, Dir: true})
 	if err != nil {
 		return err
 	}
 
-	log.Infof("Removed '/todd/agents/%s' key", adv.Uuid)
+	log.Infof("Removed '/todd/agents/%s' key", adv.UUID)
 
 	return nil
 }
