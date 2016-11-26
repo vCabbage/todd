@@ -26,10 +26,7 @@ type DeleteTestDataTask struct {
 }
 
 // Run contains the logic necessary to perform this task on the agent.
-func (dtdt DeleteTestDataTask) Run() error {
-
-	var ac = cache.NewAgentCache(dtdt.Config)
-
+func (dtdt DeleteTestDataTask) Run(ac *cache.AgentCache) error {
 	err := ac.DeleteTestRun(dtdt.TestUUID)
 	if err != nil {
 		return fmt.Errorf("DeleteTestDataTask failed - %s", dtdt.TestUUID)

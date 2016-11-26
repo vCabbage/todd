@@ -57,20 +57,26 @@ func main() {
 	}
 
 	// Set up cache
-	var ac = cache.NewAgentCache(cfg)
-	ac.Init()
+	ac, err := cache.Open(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ac.Close()
 
 	// Generate UUID
 	uuid := hostresources.GenerateUUID()
-	ac.SetKeyValue("uuid", uuid)
+	err = ac.SetKeyValue("uuid", uuid)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Infof("ToDD Agent Activated: %s", uuid)
 
 	// Start test data reporting service
-	go watchForFinishedTestRuns(cfg)
+	go watchForFinishedTestRuns(cfg, ac)
 
 	// Construct comms package
-	tc, err := comms.NewToDDComms(cfg)
+	tc, err := comms.NewAgentComms(cfg, ac)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -126,11 +132,11 @@ func main() {
 // It will periodically look at the table and send any present test data back to the server as a response.
 // When the server has successfully received this data, it will send a task back to this specific agent
 // to delete this row from the cache.
-func watchForFinishedTestRuns(cfg config.Config) error {
-
-	var ac = cache.NewAgentCache(cfg)
-
-	agentUUID := ac.GetKeyValue("uuid")
+func watchForFinishedTestRuns(cfg config.Config, ac *cache.AgentCache) error {
+	agentUUID, err := ac.GetKeyValue("uuid")
+	if err != nil {
+		return err
+	}
 
 	for {
 

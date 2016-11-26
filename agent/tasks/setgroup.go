@@ -27,12 +27,14 @@ type SetGroupTask struct {
 // TODO (mierdin): Could this not be condensed with the generic "keyvalue" task?
 
 // Run contains the logic necessary to perform this task on the agent.
-func (sgt SetGroupTask) Run() error {
-
-	var ac = cache.NewAgentCache(sgt.Config)
-
+func (sgt SetGroupTask) Run(ac *cache.AgentCache) error {
 	// First, see what the current group is. If it matches what this task is instructing, we don't need to do anything.
-	if ac.GetKeyValue("group") != sgt.GroupName {
+	groupName, err := ac.GetKeyValue("group")
+	if err != nil {
+		return err
+	}
+
+	if groupName != sgt.GroupName {
 		err := ac.SetKeyValue("group", sgt.GroupName)
 		if err != nil {
 			return fmt.Errorf("Failed to set keyvalue pair - %s:%s", "group", sgt.GroupName)
