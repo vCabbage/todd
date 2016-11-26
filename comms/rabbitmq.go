@@ -11,7 +11,6 @@ package comms
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"time"
 
@@ -289,7 +288,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 			} else {
 				log.Warnf("Agent %s did not have the required asset files. This advertisement is ignored.", agent.UUID)
 
-				var task tasks.DownloadAssetTask
+				var task tasks.DownloadAsset
 				task.Type = "DownloadAsset" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 				task.Assets = assetList
 				rmq.SendTask(agent.UUID, task)
@@ -449,124 +448,34 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
 			log.Debugf("Agent task received: %s", d.Body)
 
+			var task tasks.Task
 			// call agent task method based on type
 			switch baseMsg.Type {
 			case "DownloadAsset":
-
-				downloadAssetTask := tasks.DownloadAssetTask{
-					HTTPClient:   &http.Client{},
-					Fs:           tasks.OsFS{},
-					Ios:          tasks.IoSys{},
-					CollectorDir: fmt.Sprintf("%s/assets/factcollectors", rmq.config.LocalResources.OptDir),
-					TestletDir:   fmt.Sprintf("%s/assets/testlets", rmq.config.LocalResources.OptDir),
-				}
-
-				err = json.Unmarshal(d.Body, &downloadAssetTask)
-				// TODO(mierdin): Need to handle this error
-
-				err = downloadAssetTask.Run(rmq.ac)
-				if err != nil {
-					log.Warning("The KeyValue task failed to initialize")
-				}
-
+				task = &tasks.DownloadAsset{}
 			case "KeyValue":
-
-				kvTask := tasks.KeyValueTask{
-					Config: rmq.config,
-				}
-
-				err = json.Unmarshal(d.Body, &kvTask)
-				// TODO(mierdin): Need to handle this error
-
-				err = kvTask.Run(rmq.ac)
-				if err != nil {
-					log.Warning("The KeyValue task failed to initialize")
-				}
-
+				task = &tasks.KeyValue{}
 			case "SetGroup":
-
-				sgTask := tasks.SetGroupTask{
-					Config: rmq.config,
-				}
-
-				err = json.Unmarshal(d.Body, &sgTask)
-				// TODO(mierdin): Need to handle this error
-
-				err = sgTask.Run(rmq.ac)
-				if err != nil {
-					log.Warning("The SetGroup task failed to initialize")
-				}
-
+				task = &tasks.SetGroup{}
 			case "DeleteTestData":
-
-				dtdtTask := tasks.DeleteTestDataTask{
-					Config: rmq.config,
-				}
-
-				err = json.Unmarshal(d.Body, &dtdtTask)
-				// TODO(mierdin): Need to handle this error
-
-				err = dtdtTask.Run(rmq.ac)
-				if err != nil {
-					log.Warning("The DeleteTestData task failed to initialize")
-				}
-
+				task = &tasks.DeleteTestData{}
 			case "InstallTestRun":
-
-				// Retrieve UUID
-				uuid, err := rmq.ac.GetKeyValue("uuid")
-				if err != nil {
-					log.Errorf("unable to retrieve UUID: %v", err)
-					continue
-				}
-
-				itrTask := tasks.InstallTestRunTask{
-					Config: rmq.config,
-				}
-
-				err = json.Unmarshal(d.Body, &itrTask)
-				// TODO(mierdin): Need to handle this error
-
-				status := "ready"
-				err = itrTask.Run(rmq.ac)
-				if err != nil {
-					log.Warning("The InstallTestRun task failed to initialize")
-					status = "fail"
-				}
-
-				response := responses.NewSetAgentStatus(uuid, itrTask.Tr.UUID, status)
-
-				rmq.SendResponse(response)
-
+				task = &tasks.InstallTestRun{}
 			case "ExecuteTestRun":
-
-				// Retrieve UUID
-				uuid, err := rmq.ac.GetKeyValue("uuid")
-				if err != nil {
-					log.Errorf("unable to retrieve UUID: %v", err)
-					continue
-				}
-
-				etrTask := tasks.ExecuteTestRunTask{
-					Config: rmq.config,
-				}
-
-				err = json.Unmarshal(d.Body, &etrTask)
-				// TODO(mierdin): Need to handle this error
-
-				// Send status that the testing has begun, right now.
-				response := responses.NewSetAgentStatus(uuid, etrTask.TestUUID, "testing")
-				rmq.SendResponse(response)
-
-				err = etrTask.Run(rmq.ac)
-				if err != nil {
-					log.Warning("The ExecuteTestRun task failed to initialize")
-					response.Status = "fail"
-					rmq.SendResponse(response)
-				}
-
+				task = &tasks.ExecuteTestRun{}
 			default:
 				log.Errorf(fmt.Sprintf("Unexpected type value for received task: %s", baseMsg.Type))
+				continue
+			}
+
+			err = json.Unmarshal(d.Body, task)
+			if err != nil {
+				log.Error("Error unmarshalling task:", err)
+			}
+
+			err := task.Run(&rmq.config, rmq.ac, rmq.SendResponse)
+			if err != nil {
+				log.Warning("Error running task:", err)
 			}
 		}
 	}()
@@ -902,7 +811,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				}
 
 				// Send task to the agent that says to delete the entry
-				var dtdt tasks.DeleteTestDataTask
+				var dtdt tasks.DeleteTestData
 				dtdt.Type = "DeleteTestData" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 				dtdt.TestUUID = utdr.TestUUID
 				rmq.SendTask(utdr.AgentUUID, dtdt)

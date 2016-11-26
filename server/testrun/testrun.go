@@ -132,9 +132,9 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 	}
 
 	// Prepare a task for carrying the testrun instruction to the agent
-	var itrTask tasks.InstallTestRunTask
+	var itrTask tasks.InstallTestRun
 	itrTask.Type = "InstallTestRun" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-	itrTask.Tr = sourceTr
+	itrTask.TR = sourceTr
 
 	// Send testrun to each agent UUID in the sources group
 	// TODO(mierdin): this is something I'd like to improve in the future. Right now this works, and is sort-of resilient, since
@@ -153,9 +153,9 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 			Testlet: trObj.Spec.Target.(map[string]interface{})["app"].(string),
 			Args:    trObj.Spec.Target.(map[string]interface{})["args"].(string),
 		}
-		var itrTask tasks.InstallTestRunTask
+		var itrTask tasks.InstallTestRun
 		itrTask.Type = "InstallTestRun" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-		itrTask.Tr = targetTr
+		itrTask.TR = targetTr
 
 		tc, err := comms.NewToDDComms(cfg)
 		if err != nil {
@@ -223,7 +223,7 @@ readyloop:
 	// If this is a group target type, we want to make sure that the targets are set up and reporting a status of "testing"
 	// before we spin up the source tests
 	if trObj.Spec.TargetType == "group" {
-		var targetTask tasks.ExecuteTestRunTask
+		var targetTask tasks.ExecuteTestRun
 		targetTask.Type = "ExecuteTestRun" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 		targetTask.TestUUID = testUUID
 		targetTask.TimeLimit = cfg.Testing.Timeout
@@ -276,7 +276,7 @@ readyloop:
 	}
 
 	// The targets are ready; execute testing on the source agents
-	var sourceTask tasks.ExecuteTestRunTask
+	var sourceTask tasks.ExecuteTestRun
 	sourceTask.Type = "ExecuteTestRun" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 	sourceTask.TestUUID = testUUID
 	sourceTask.TimeLimit = 30

@@ -90,7 +90,7 @@ next:
 	}
 
 	for uuid, groupName := range groupmap {
-		setGroupTask := tasks.SetGroupTask{
+		setGroupTask := tasks.SetGroup{
 			GroupName: groupName,
 		}
 
@@ -100,7 +100,7 @@ next:
 
 	// need to send a message to all agents that weren't in groupmap to set their group to nothing
 	for x := range lonelyAgents {
-		setGroupTask := tasks.SetGroupTask{
+		setGroupTask := tasks.SetGroup{
 			GroupName: "",
 		}
 
