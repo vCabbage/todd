@@ -107,18 +107,24 @@ func main() {
 			defaultaddr = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
 		}
 
+		fcts, err := facts.GetFacts(cfg)
+		if err != nil {
+			log.Errorf("Error gathering facts: %v", err)
+			continue
+		}
+
 		// Create an AgentAdvert instance to represent this particular agent
 		me := defs.AgentAdvert{
 			UUID:           uuid,
 			DefaultAddr:    defaultaddr,
 			FactCollectors: gatheredAssets["factcollectors"],
 			Testlets:       gatheredAssets["testlets"],
-			Facts:          facts.GetFacts(cfg),
+			Facts:          fcts,
 			LocalTime:      time.Now().UTC(),
 		}
 
 		// Advertise this agent
-		err := tc.Package.AdvertiseAgent(me)
+		err = tc.Package.AdvertiseAgent(me)
 		if err != nil {
 			log.Error("Failed to advertise agent after several retries")
 		}
