@@ -17,7 +17,6 @@ import (
 
 	"github.com/toddproject/todd/agent/cache"
 	"github.com/toddproject/todd/agent/defs"
-	"github.com/toddproject/todd/agent/responses"
 	"github.com/toddproject/todd/agent/tasks"
 	"github.com/toddproject/todd/config"
 )
@@ -53,7 +52,7 @@ type Package interface {
 	ListenForGroupTasks(string, chan bool) error
 
 	ListenForResponses(*chan bool) error
-	SendResponse(responses.Response) error
+	SendResponse(interface{}) error
 
 	// adds a cache agent to the comms package. temporary until
 	// comms package is refactored

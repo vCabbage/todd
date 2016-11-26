@@ -158,17 +158,12 @@ func watchForFinishedTestRuns(cfg config.Config, ac *cache.AgentCache) error {
 
 			log.Debug("Found ripe testrun: ", testUUID)
 
-			utdr := responses.UploadTestDataResponse{
-				TestUUID: testUUID,
-				TestData: testData,
-			}
-			utdr.AgentUUID = agentUUID
-			utdr.Type = "TestData" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-
 			tc, err := comms.NewToDDComms(cfg)
 			if err != nil {
 				return err
 			}
+
+			utdr := responses.NewUploadTestData(agentUUID, testUUID, testData)
 			tc.Package.SendResponse(utdr)
 
 		}
