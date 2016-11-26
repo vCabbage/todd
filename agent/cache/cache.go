@@ -23,50 +23,55 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 
-	log "github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3" // This look strange but is necessary - the sqlite package is used indirectly by database/sql
+	"github.com/pkg/errors"
 
 	"github.com/toddproject/todd/config"
 )
 
-func NewAgentCache(cfg config.Config) *AgentCache {
-	var ac AgentCache
-	ac.dbLoc = fmt.Sprintf("%s/agent_cache.db", cfg.LocalResources.OptDir)
-	return &ac
+// New returns a new AgentCache.
+func New(cfg config.Config) *AgentCache {
+	return &AgentCache{dbLoc: filepath.Join(cfg.LocalResources.OptDir, "agent_cache.db")}
 }
 
+// AgentCache provides methods for interacting with the on disk cache.
 type AgentCache struct {
 	// Need similar abstractions to what you did in the tasks package
 	dbLoc string
+	db    *sql.DB
 }
 
-// TODO(mierdin): Handling errors in this package?
-
 // Init will set up the sqlite database to serve as this agent cache.
-func (ac AgentCache) Init() {
-
+func (ac *AgentCache) Init() error {
 	// Clean up any old cache data
-	os.Remove(ac.dbLoc)
+	err := os.Remove(ac.dbLoc)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "removing existing DB file")
+	}
 
 	// Open connection
 	db, err := sql.Open("sqlite3", ac.dbLoc)
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "opening DB file")
 	}
-	defer db.Close()
+	ac.db = db
 
 	// Initialize database
-	sqlStmt := `
-    create table testruns (id integer not null primary key, uuid text, testlet text, args text, targets text, results text);
-    delete from testruns;
-    create table keyvalue (id integer not null primary key, key text, value text);
-    delete from keyvalue;
-    `
+	const sqlStmt = `
+		CREATE TABLE testruns (id INTEGER NOT NULL PRIMARY KEY, uuid TEXT, testlet TEXT, args TEXT, targets TEXT, results TEXT);
+		CREATE TABLE keyvalue (id INTEGER NOT NULL PRIMARY KEY, key TEXT, value TEXT);
+	`
 
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
-		log.Errorf("%q: %s\n", err, sqlStmt)
-		return
+		return fmt.Errorf("%q: %s", err, sqlStmt)
 	}
+	return nil
+}
+
+// Close closes the underlying database connection.
+func (ac *AgentCache) Close() error {
+	return ac.db.Close()
 }

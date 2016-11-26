@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/toddproject/todd/agent/cache"
 )
 
 // DownloadAssetTask defines this particular task. It contains definitions not only for the task message, but
@@ -31,7 +32,7 @@ type DownloadAssetTask struct {
 
 // Run contains the logic necessary to perform this task on the agent. This particular task will download all required assets,
 // copy them into the appropriate directory, and ensure that the execute permission is given to each collector file.
-func (dat DownloadAssetTask) Run() error {
+func (dat DownloadAssetTask) Run(*cache.AgentCache) error {
 
 	// Iterate over the slice of collectors and download them.
 	for x := range dat.Assets {
