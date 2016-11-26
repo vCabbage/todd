@@ -11,21 +11,21 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/pkg/errors"
 	"github.com/toddproject/todd/server/objects"
 )
 
 // Create is responsible for pushing a ToDD object to the server for eventual storage in whatever database is being used
 // It will send a ToddObject rendered as JSON to the "createobject" method of the ToDD API
-func (capi ClientAPI) Create(conf map[string]string, yamlFileName string) error {
-
+func (c *ClientAPI) Create(yamlFileName string) error {
 	// Pull YAML from either stdin or from the filename if stdin is empty
 	yamlDef, err := getYAMLDef(yamlFileName)
 	if err != nil {
@@ -33,77 +33,56 @@ func (capi ClientAPI) Create(conf map[string]string, yamlFileName string) error 
 	}
 
 	// Unmarshal YAML file into a BaseObject so we can peek into the metadata
-	var baseobj objects.BaseObject
-	err = yaml.Unmarshal(yamlDef, &baseobj)
+	var baseObj objects.BaseObject
+	err = yaml.Unmarshal(yamlDef, &baseObj)
 	if err != nil {
 		return errors.New("YAML file not in correct format")
 	}
 
 	// finalobj represents the object being created, regardless of type.
 	// ToddObject is an interface that satisfies all ToDD objects
-	var finalobj objects.ToddObject
-
-	switch baseobj.Type {
+	var finalObj objects.ToddObject
+	switch baseObj.Type {
 	case "group":
-		var groupObj objects.GroupObject
-		err = yaml.Unmarshal(yamlDef, &groupObj)
-		if err != nil {
-			return errors.New("Group YAML object not in correct format")
-		}
-		finalobj = groupObj
+		finalObj = &objects.GroupObject{}
 	case "testrun":
-		var testrunObj objects.TestRunObject
-		err = yaml.Unmarshal(yamlDef, &testrunObj)
-		if err != nil {
-			return errors.New("Testrun YAML object not in correct format")
-		}
-
-		if testrunObj.Spec.TargetType == "group" {
-
-			// We need to do a quick conversion because JSON does not support non-string
-			// keys, and would reject this during Marshal if we don't.
-			stringifiedMap := make(map[string]string)
-			for k, v := range testrunObj.Spec.Target.(map[interface{}]interface{}) {
-				stringifiedMap[k.(string)] = v.(string)
-			}
-			testrunObj.Spec.Target = stringifiedMap
-
-		}
-
-		finalobj = testrunObj
-
+		finalObj = &objects.TestRunObject{}
 	default:
 		return errors.New("Invalid object type provided")
 	}
+	err = yaml.Unmarshal(yamlDef, finalObj)
+	if err != nil {
+		return errors.New("Testrun YAML object not in correct format")
+	}
 
 	// Marshal the final object into JSON
-	jsonByte, err := json.Marshal(finalobj)
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(finalObj)
 	if err != nil {
 		return errors.New("Problem marshalling the final object into JSON")
 	}
 
 	// Construct API request, and send POST to server for this object
-	url := fmt.Sprintf("http://%s:%s/v1/object/create", conf["host"], conf["port"])
+	url := c.baseURL + "/object/create"
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonByte))
+	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "creating request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "sending request")
 	}
-	defer resp.Body.Close()
+	io.Copy(ioutil.Discard, resp.Body)
+	resp.Body.Close()
 
 	// Print a regular OK message if object was created successfully - else print the HTTP status code
-	if resp.Status == "200 OK" {
-		fmt.Println("[OK]")
-	} else {
+	if resp.StatusCode != 200 {
 		return errors.New(resp.Status)
 	}
+	fmt.Println("[OK]")
 
 	return nil
 }

@@ -13,19 +13,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 )
 
 // Delete will send a request to remove an existing ToDD Object
-func (capi ClientAPI) Delete(conf map[string]string, objType, objLabel string) error {
-
+func (c *ClientAPI) Delete(objType, objLabel string) error {
 	// If insufficient subargs were provided, error out
 	if objType == "" || objLabel == "" {
 		return errors.New("Error, need to provide type and label (Ex. 'todd delete group datacenter')")
 	}
 
 	// anonymous struct to hold our delete info
-	deleteinfo := struct {
+	deleteInfo := struct {
 		Label string `json:"label"`
 		Type  string `json:"type"`
 	}{
@@ -34,33 +35,33 @@ func (capi ClientAPI) Delete(conf map[string]string, objType, objLabel string) e
 	}
 
 	// Marshal deleteinfo into JSON
-	jsonByte, err := json.Marshal(deleteinfo)
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(deleteInfo)
 	if err != nil {
 		return err
 	}
 
 	// Construct API request, and send POST to server for this object
-	url := fmt.Sprintf("http://%s:%s/v1/object/delete", conf["host"], conf["port"])
+	url := c.baseURL + "/object/delete"
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonByte))
+	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	io.Copy(ioutil.Discard, resp.Body)
+	resp.Body.Close()
 
 	// Print a regular OK message if object was written successfully - else print the HTTP status code
-	if resp.Status == "200 OK" {
-		fmt.Println("[OK]")
-	} else {
+	if resp.StatusCode != 200 {
 		return errors.New(resp.Status)
 	}
+	fmt.Println("[OK]")
 
 	return nil
 }

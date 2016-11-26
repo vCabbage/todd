@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -22,12 +23,7 @@ import (
 )
 
 // Run is responsible for activating an existing testrun object
-func (capi ClientAPI) Run(conf map[string]string, testrunName string, displayReport, skipConfirm bool) error {
-
-	sourceGroup := conf["sourceGroup"]
-	sourceApp := conf["sourceApp"]
-	sourceArgs := conf["sourceArgs"]
-
+func (c *ClientAPI) Run(sourceGroup, sourceApp, sourceArgs, testrunName string, displayReport, skipConfirm bool) error {
 	// If no subarg was provided, do nothing
 	if testrunName == "" {
 		return errors.New("Please provide testrun object name to run.")
@@ -65,29 +61,34 @@ func (capi ClientAPI) Run(conf map[string]string, testrunName string, displayRep
 	if err != nil {
 		return err
 	}
-	// Construct API request, and send POST to server for this object
-	url := fmt.Sprintf("http://%s:%s/v1/testrun/run", conf["host"], conf["port"])
 
+	// Construct API request, and send POST to server for this object
+	url := c.baseURL + "/testrun/run"
 	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
+	defer io.Copy(ioutil.Discard, resp.Body)
 	defer resp.Body.Close()
 
-	// Print a regular OK message if object was written successfully - else print the HTTP status code
-	if resp.Status != "200 OK" {
+	if resp.StatusCode != 200 {
 		return errors.New(resp.Status)
 	}
 
-	serverResponse, _ := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
-	switch string(serverResponse) {
+	testUUID := string(body)
+
+	switch testUUID {
 	case "notfound":
 		return errors.New("ERROR - Specified testrun object not found")
 	case "invalidtopology":
@@ -96,14 +97,11 @@ func (capi ClientAPI) Run(conf map[string]string, testrunName string, displayRep
 		return errors.New("ERROR - some kind of error was encountered on the server. Test was not run")
 	}
 
-	testUUID := string(serverResponse)
-
 	fmt.Print("\nRUNNING TEST: ", testUUID)
 	fmt.Print("\n\n")
-
 	fmt.Println("(Please be patient while the test finishes...)")
 
-	err = listenForTestStatus(conf)
+	err = listenForTestStatus(c.host)
 	if err != nil {
 		fmt.Printf("Problem subscribing to testrun updates stream: %s\n", err)
 		fmt.Println("Will now watch the testrun metrics API for 45 seconds to see if we get a result that way. Please wait...")
@@ -111,14 +109,14 @@ func (capi ClientAPI) Run(conf map[string]string, testrunName string, displayRep
 
 	// Poll for results
 	timeout := time.After(45 * time.Second)
-	data, err := getRunResult(conf, testUUID)
+	data, err := getRunResult(c.baseURL, testUUID)
 	for err != nil {
 		select {
 		case <-timeout:
 			return errors.New("Failed to retrieve test data after 45 seconds. Something must be wrong - quitting.")
 		default:
 			time.Sleep(1 * time.Second)
-			data, err = getRunResult(conf, testUUID)
+			data, err = getRunResult(c.baseURL, testUUID)
 		}
 	}
 
@@ -138,12 +136,10 @@ func (capi ClientAPI) Run(conf map[string]string, testrunName string, displayRep
 	return nil
 }
 
-var errNoTestResult = errors.New("No test result")
-
 // getRunResult collects the results of test run from the server's REST API
-func getRunResult(conf map[string]string, testUUID string) ([]byte, error) {
+func getRunResult(baseURL string, testUUID string) ([]byte, error) {
 	// Go back and get our testrun data
-	url := fmt.Sprintf("http://%s:%s/v1/testdata?testUuid=%s", conf["host"], conf["port"], testUUID)
+	url := fmt.Sprintf("%s/testdata?testUuid=%s", baseURL, testUUID)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -153,8 +149,8 @@ func getRunResult(conf map[string]string, testUUID string) ([]byte, error) {
 	// Defer the closing of the body
 	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return nil, errNoTestResult
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
 	}
 
 	return ioutil.ReadAll(resp.Body)
@@ -163,9 +159,9 @@ func getRunResult(conf map[string]string, testUUID string) ([]byte, error) {
 // listenForTestStatus connects to the server's test event stream and prints the progression
 //
 // This blocks until all agents have finished or an error occurs.
-func listenForTestStatus(conf map[string]string) error {
+func listenForTestStatus(host string) error {
 	retries := 0
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:8081", conf["host"]))
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:8081", host))
 
 	// If the call to net.Dial produces an error, this loop will execute the call again
 	// until "retries" reaches it's configured limit
@@ -177,14 +173,13 @@ func listenForTestStatus(conf map[string]string) error {
 		retries++
 		time.Sleep(1 * time.Second)
 		fmt.Println("Failed to subscribe to test event stream. Retrying...")
-		conn, err = net.Dial("tcp", fmt.Sprintf("%s:8081", conf["host"]))
+		conn, err = net.Dial("tcp", fmt.Sprintf("%s:8081", host))
 	}
 	defer conn.Close()
 
 	var recordCount int
 	firstMessage := false
 	for {
-
 		// listen for reply
 		message, err := bufio.NewReader(conn).ReadString('\n')
 		// If an error is raised, it's probably because the server killed the connection

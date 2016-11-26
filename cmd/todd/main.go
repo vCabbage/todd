@@ -18,14 +18,13 @@ import (
 
 func main() {
 
-	var clientAPI capi.ClientAPI
-
 	app := cli.NewApp()
 	app.Name = "todd"
 	app.Version = "v0.1.0"
 	app.Usage = "A highly extensible framework for distributed testing on demand"
 
-	var host, port string
+	var host string
+	var port int
 
 	// global level flags
 	app.Flags = []cli.Flag{
@@ -35,12 +34,18 @@ func main() {
 			Value:       "localhost",
 			Destination: &host,
 		},
-		cli.StringFlag{
+		cli.IntFlag{
 			Name:        "P, port",
 			Usage:       "ToDD server API port",
-			Value:       "8080",
+			Value:       8080,
 			Destination: &port,
 		},
+	}
+
+	var clientAPI *capi.ClientAPI
+	app.Before = func(c *cli.Context) error {
+		clientAPI = capi.New(c.String("host"), c.Int("port"))
+		return nil
 	}
 
 	// ToDD Commands
@@ -51,13 +56,7 @@ func main() {
 			Name:  "agents",
 			Usage: "Show ToDD agent information",
 			Action: func(c *cli.Context) {
-				agents, err := clientAPI.Agents(
-					map[string]string{
-						"host": host,
-						"port": port,
-					},
-					c.Args().Get(0),
-				)
+				agents, err := clientAPI.Agents(c.Args().Get(0))
 				if err != nil {
 					fmt.Println(err)
 					os.Exit(1)
@@ -75,13 +74,7 @@ func main() {
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
 
-				err := clientAPI.Create(
-					map[string]string{
-						"host": host,
-						"port": port,
-					},
-					c.Args().Get(0),
-				)
+				err := clientAPI.Create(c.Args().Get(0))
 				if err != nil {
 					fmt.Println(err)
 					os.Exit(1)
@@ -95,10 +88,6 @@ func main() {
 			Usage: "Delete ToDD object",
 			Action: func(c *cli.Context) {
 				err := clientAPI.Delete(
-					map[string]string{
-						"host": host,
-						"port": port,
-					},
 					c.Args().Get(0),
 					c.Args().Get(1),
 				)
@@ -115,12 +104,7 @@ func main() {
 			Name:  "groups",
 			Usage: "Show current agent-to-group mappings",
 			Action: func(c *cli.Context) {
-				err := clientAPI.Groups(
-					map[string]string{
-						"host": host,
-						"port": port,
-					},
-				)
+				err := clientAPI.Groups()
 				if err != nil {
 					fmt.Println(err)
 					os.Exit(1)
@@ -133,13 +117,7 @@ func main() {
 			Name:  "objects",
 			Usage: "Show information about installed group objects",
 			Action: func(c *cli.Context) {
-				err := clientAPI.Objects(
-					map[string]string{
-						"host": host,
-						"port": port,
-					},
-					c.Args().Get(0),
-				)
+				err := clientAPI.Objects(c.Args().Get(0))
 				if err != nil {
 					fmt.Println(err)
 					os.Exit(1)
@@ -175,13 +153,9 @@ func main() {
 			Usage: "Execute an already uploaded testrun object",
 			Action: func(c *cli.Context) {
 				err := clientAPI.Run(
-					map[string]string{
-						"host":        host,
-						"port":        port,
-						"sourceGroup": c.String("source-group"),
-						"sourceApp":   c.String("source-app"),
-						"sourceArgs":  c.String("source-args"),
-					},
+					c.String("source-group"),
+					c.String("source-app"),
+					c.String("source-args"),
 					c.Args().Get(0),
 					c.Bool("j"),
 					c.Bool("y"),

@@ -10,12 +10,14 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
-	"text/tabwriter"
 	"text/template"
+
+	"text/tabwriter"
 
 	"github.com/toddproject/todd/agent/defs"
 	"github.com/toddproject/todd/hostresources"
@@ -24,101 +26,68 @@ import (
 // Agents will query the ToDD server for a list of currently registered agents, and will display
 // a list of them to the user. Optionally, the user can provide a subargument containing the UUID of
 // a registered agent, and this function will output more detailed information about that agent.
-func (capi ClientAPI) Agents(conf map[string]string, agentUUID string) ([]defs.AgentAdvert, error) {
-
-	var agents []defs.AgentAdvert
-
-	var url string
-
+func (c *ClientAPI) Agents(agentUUID string) ([]defs.AgentAdvert, error) {
+	url := c.baseURL + "/agent"
 	if agentUUID != "" {
-		url = fmt.Sprintf("http://%s:%s/v1/agent?uuid=%s", conf["host"], conf["port"], agentUUID)
-	} else {
-		url = fmt.Sprintf("http://%s:%s/v1/agent", conf["host"], conf["port"])
+		url = fmt.Sprintf("%s?uuid=%s", url, agentUUID)
 	}
 
-	// Build the request
-	req, err := http.NewRequest("GET", url, nil)
+	resp, err := c.http.Get(url)
 	if err != nil {
-		return agents, err
+		return nil, err
 	}
-
-	// Send the request via a client
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return agents, err
-	}
-
-	// Defer the closing of the body
+	defer io.Copy(ioutil.Discard, resp.Body) // Ensure fully read so client can be reused
 	defer resp.Body.Close()
-	// Read the content into a byte array
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return agents, err
+
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
 	}
 
 	// Marshal API data into object
-	err = json.Unmarshal(body, &agents)
+	var agents []defs.AgentAdvert
+	err = json.NewDecoder(resp.Body).Decode(&agents)
+
 	return agents, err
 }
 
-// DisplayAgents is responsible for displaying a set of Agents to the terminal
-func (capi ClientAPI) DisplayAgents(agents []defs.AgentAdvert, detail bool) error {
-
-	if len(agents) == 0 {
-		fmt.Println("No agents found.")
-		return nil
-	}
-
-	if agents[0].UUID == "" {
-		fmt.Println("No agents found.")
-		return nil
-	}
-
-	if detail {
-
-		// TODO(moswalt): if nothing found, API should return either null or empty slice, and client should handle this
-		tmpl, err := template.New("test").Parse(
-			`Agent UUID:  {{.UUID}}
+var detailTemplate = template.Must(template.New("test").Parse(
+	`{{range .}}Agent UUID:  {{.UUID}}
 Expires:  {{.Expires}}
 Collector Summary: {{.CollectorSummary}}
 Facts:
-{{.PPFacts}}` + "\n")
+{{.PPFacts}}
+{{end}}`))
 
-		if err != nil {
-			return err
-		}
+// DisplayAgents is responsible for displaying a set of Agents to the terminal
+func (c *ClientAPI) DisplayAgents(agents []defs.AgentAdvert, detail bool) error {
+	switch {
+	case len(agents) == 0, agents[0].UUID == "":
+		fmt.Println("No agents found.")
+		return nil
+	case detail:
+		// TODO(moswalt): if nothing found, API should return either null or empty slice, and client should handle this
 
 		// Output retrieved data
-		for i := range agents {
-			err = tmpl.Execute(os.Stdout, agents[i])
-			if err != nil {
-				return err
-			}
-		}
-
-	} else {
-		w := new(tabwriter.Writer)
-
-		// Format in tab-separated columns with a tab stop of 8.
-		w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-		fmt.Fprintln(w, "UUID\tEXPIRES\tADDR\tFACT SUMMARY\tCOLLECTOR SUMMARY")
-
-		for i := range agents {
-			fmt.Fprintf(
-				w,
-				"%s\t%s\t%s\t%s\t%s\n",
-				hostresources.TruncateID(agents[i].UUID),
-				agents[i].Expires,
-				agents[i].DefaultAddr,
-				agents[i].FactSummary(),
-				agents[i].CollectorSummary(),
-			)
-		}
-		fmt.Fprintln(w)
-		w.Flush()
-
+		return detailTemplate.Execute(os.Stdout, agents)
 	}
+
+	// Format in tab-separated columns with a tab stop of 8.
+	w := tabwriter.NewWriter(os.Stdout, 0, 8, 0, '\t', 0)
+	fmt.Fprintln(w, "UUID\tEXPIRES\tADDR\tFACT SUMMARY\tCOLLECTOR SUMMARY")
+
+	for i := range agents {
+		fmt.Fprintf(
+			w,
+			"%s\t%s\t%s\t%s\t%s\n",
+			hostresources.TruncateID(agents[i].UUID),
+			agents[i].Expires,
+			agents[i].DefaultAddr,
+			agents[i].FactSummary(),
+			agents[i].CollectorSummary(),
+		)
+	}
+	fmt.Fprintln(w)
+	w.Flush()
 
 	return nil
 }

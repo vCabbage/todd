@@ -10,9 +10,10 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"text/tabwriter"
 
@@ -20,25 +21,19 @@ import (
 )
 
 // Groups will query ToDD for a map containing current agent-to-group mappings
-func (capi ClientAPI) Groups(conf map[string]string) error {
-
-	url := fmt.Sprintf("http://%s:%s/v1/groups", conf["host"], conf["port"])
-
-	// Build the request
-	req, err := http.NewRequest("GET", url, nil)
+func (c *ClientAPI) Groups() error {
+	url := c.baseURL + "/groups"
+	resp, err := c.http.Get(url)
 	if err != nil {
 		return err
 	}
-
-	// Send the request via a client
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	// Defer the closing of the body
+	defer io.Copy(ioutil.Discard, resp.Body)
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return errors.New(resp.Status)
+	}
+
 	// Read the content into a byte array
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -52,10 +47,8 @@ func (capi ClientAPI) Groups(conf map[string]string) error {
 		return err
 	}
 
-	w := new(tabwriter.Writer)
-
 	// Format in tab-separated columns with a tab stop of 8.
-	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
+	w := tabwriter.NewWriter(os.Stdout, 0, 8, 0, '\t', 0)
 	fmt.Fprintln(w, "UUID\tGROUP NAME")
 
 	for agentUUID, groupName := range groupmap {
@@ -70,5 +63,4 @@ func (capi ClientAPI) Groups(conf map[string]string) error {
 	w.Flush()
 
 	return nil
-
 }

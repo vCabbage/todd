@@ -71,7 +71,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 	for agent, group := range allGroupMap {
 
 		// If our target type is group, and the group this agent is in matches the target group provided in the testrun object, add it to our map
-		if trObj.Spec.TargetType == "group" && group == trObj.Spec.Target.(map[string]interface{})["name"].(string) {
+		if trObj.Spec.TargetType == "group" && group == trObj.Spec.Target.Map["name"] {
 			testAgentMap["targets"][agent] = group
 		} else if group == trObj.Spec.Source["name"] {
 			testAgentMap["sources"][agent] = group
@@ -120,15 +120,8 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 		sourceTr.Targets = targetIPs
 
 	} else {
-
 		// This is an uncontrolled target, so we are deriving target IPs directly from what's listed in the testrun object
-		var targetIPs []string
-		specTargets := trObj.Spec.Target.([]interface{})
-		for x := range specTargets {
-			targetIPs = append(targetIPs, specTargets[x].(string))
-		}
-
-		sourceTr.Targets = targetIPs
+		sourceTr.Targets = trObj.Spec.Target.Slice
 	}
 
 	// Prepare a task for carrying the testrun instruction to the agent
@@ -151,8 +144,8 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 		var targetTr = defs.TestRun{
 			UUID:    testUUID,
 			Targets: []string{"0.0.0.0"}, // Targets are typically running some kind of ongoing service, so we send a single target of 0.0.0.0 to indicate this.
-			Testlet: trObj.Spec.Target.(map[string]interface{})["app"].(string),
-			Args:    trObj.Spec.Target.(map[string]interface{})["args"].(string),
+			Testlet: trObj.Spec.Target.Map["app"],
+			Args:    trObj.Spec.Target.Map["args"],
 		}
 
 		itrTask := &tasks.InstallTestRun{
@@ -259,7 +252,7 @@ readyloop:
 				if val, ok := targetmap[agent]; ok {
 
 					//...and it's also in our target group, add it to our targets map
-					if val == trObj.Spec.Target.(map[string]interface{})["name"].(string) {
+					if val == trObj.Spec.Target.Map["name"] {
 						targetStatuses[agent] = status
 					}
 				}

@@ -10,10 +10,10 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
@@ -42,9 +42,7 @@ var testAgent = defs.AgentAdvert{
 
 // TestAgents tests the ability for the Agents client API call to function correctly
 func TestAgents(t *testing.T) {
-
 	testAgentSlice := []defs.AgentAdvert{testAgent}
-
 	agentJSON, err := json.Marshal(testAgentSlice)
 	if err != nil {
 		t.Error(err)
@@ -55,23 +53,10 @@ func TestAgents(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	u, err := url.Parse(ts.URL)
-	if err != nil {
-		t.Error(err)
-	}
-
-	host, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		t.Error(err)
-	}
-
-	var capi ClientAPI
-	agents, err := capi.Agents(
-		map[string]string{
-			"host": host,
-			"port": port,
-		}, "",
-	)
+	port := ts.Listener.Addr().(*net.TCPAddr).Port
+	capi := New("localhost", port)
+	fmt.Println("THIS", capi.baseURL)
+	agents, err := capi.Agents("")
 	if err != nil {
 		t.Error(err)
 	}
