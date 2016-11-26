@@ -34,7 +34,7 @@ type InstallTestRunTask struct {
 // The installation procedure will first run the referenced testlet in check mode
 // to help ensure that the actual testrun execution can take place. If that
 // succeeds, the testrun is installed in the agent cache.
-func (itt InstallTestRunTask) Run() error {
+func (itt InstallTestRunTask) Run(ac *cache.AgentCache) error {
 
 	if itt.Tr.Testlet == "" {
 		log.Error("Testlet parameter for this testrun is null")
@@ -67,7 +67,6 @@ func (itt InstallTestRunTask) Run() error {
 	}
 
 	// Insert testrun into agent cache
-	var ac = cache.NewAgentCache(itt.Config)
 	err = ac.InsertTestRun(itt.Tr)
 	if err != nil {
 		log.Error(err)

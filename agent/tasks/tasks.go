@@ -11,6 +11,8 @@ package tasks
 import (
 	"io"
 	"os"
+
+	"github.com/toddproject/todd/agent/cache"
 )
 
 // Task is an interface to define task behavior This is used for functions like those in comms
@@ -20,7 +22,7 @@ type Task interface {
 	// TODO(mierdin): This works but is a little "meh". Basically, each task has to have a "Run()" function, as enforced
 	// by this interface. If the task needs some additional data, it gets these through struct properties. This works but
 	// doesn't quite feel right. Come back to this and see if there's a better way.
-	Run() error
+	Run(*cache.AgentCache) error
 }
 
 // BaseTask is a struct that is intended to be embedded by specific task structs. Both of these in conjunction

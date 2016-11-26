@@ -50,6 +50,7 @@ func newRabbitMQComms(cfg config.Config) *rabbitMQComms {
 type rabbitMQComms struct {
 	config   config.Config
 	queueURL string
+	ac       *cache.AgentCache
 }
 
 // connectRabbitMQ wraps the amqp.Dial function in order to provide connection retry functionality
@@ -463,7 +464,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				err = json.Unmarshal(d.Body, &downloadAssetTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = downloadAssetTask.Run()
+				err = downloadAssetTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The KeyValue task failed to initialize")
 				}
@@ -477,7 +478,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				err = json.Unmarshal(d.Body, &kvTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = kvTask.Run()
+				err = kvTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The KeyValue task failed to initialize")
 				}
@@ -491,7 +492,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				err = json.Unmarshal(d.Body, &sgTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = sgTask.Run()
+				err = sgTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The SetGroup task failed to initialize")
 				}
@@ -505,7 +506,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				err = json.Unmarshal(d.Body, &dtdtTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = dtdtTask.Run()
+				err = dtdtTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The DeleteTestData task failed to initialize")
 				}
@@ -513,8 +514,11 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 			case "InstallTestRun":
 
 				// Retrieve UUID
-				var ac = cache.NewAgentCache(rmq.config)
-				uuid := ac.GetKeyValue("uuid")
+				uuid, err := rmq.ac.GetKeyValue("uuid")
+				if err != nil {
+					log.Errorf("unable to retrieve UUID: %v", err)
+					continue
+				}
 
 				itrTask := tasks.InstallTestRunTask{
 					Config: rmq.config,
@@ -528,7 +532,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				response.AgentUUID = uuid
 				response.TestUUID = itrTask.Tr.UUID
 
-				err = itrTask.Run()
+				err = itrTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The InstallTestRun task failed to initialize")
 					response.Status = "fail"
@@ -540,8 +544,11 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 			case "ExecuteTestRun":
 
 				// Retrieve UUID
-				var ac = cache.NewAgentCache(rmq.config)
-				uuid := ac.GetKeyValue("uuid")
+				uuid, err := rmq.ac.GetKeyValue("uuid")
+				if err != nil {
+					log.Errorf("unable to retrieve UUID: %v", err)
+					continue
+				}
 
 				etrTask := tasks.ExecuteTestRunTask{
 					Config: rmq.config,
@@ -559,7 +566,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				response.Type = "AgentStatus" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 				rmq.SendResponse(response)
 
-				err = etrTask.Run()
+				err = etrTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The ExecuteTestRun task failed to initialize")
 					response.Status = "fail"
@@ -580,15 +587,15 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
 // WatchForGroup should be run as a goroutine, like other background services. This is because it will itself spawn a goroutine to
 // listen for tasks that are sent to groups, and this goroutine can be restarted when group membership changes
-func (rmq rabbitMQComms) WatchForGroup() {
-
-	var ac = cache.NewAgentCache(rmq.config)
-
+func (rmq rabbitMQComms) WatchForGroup() error {
 	// dereg is a channel that allows us to instruct the goroutine that's listening for tests to stop. This allows us to re-register to a new command
 	dereg := make(chan bool)
 rereg:
 
-	group := ac.GetKeyValue("group")
+	group, err := rmq.ac.GetKeyValue("group")
+	if err != nil {
+		return err
+	}
 
 	// if the group is nothing, rewrite to "mull". This is being done for now so that we don't have to worry if the goroutine was started or not
 	// This way, it's always running, but if the agent is not in a group, it's listening on the "null" queue, which never has anything on it.
@@ -614,18 +621,25 @@ rereg:
 		time.Sleep(2 * time.Second)
 
 		// The key "unackedGroup" stores a "true" or "false" to indicate that there has been a group change that we need to acknowledge (handle)
-		if ac.GetKeyValue("unackedGroup") == "true" {
+		unackedGroup, err := rmq.ac.GetKeyValue("unackedGroup")
+		if err != nil {
+			log.Warnf("unable to retrieve unackedGroup: %v\n", err)
+			continue
+		}
+		if unackedGroup == "true" {
 
 			// This will kill the underlying goroutine, and in effect stop listening to the old queue.
 			dereg <- true
 
 			// Finally, set the "unackedGroup" to indicate that we've acknowledged the group change, and go back to the "rereg" label
 			// to re-register onto the new group name
-			ac.SetKeyValue("unackedGroup", "false")
+			err := rmq.ac.SetKeyValue("unackedGroup", "false")
+			if err != nil {
+				log.Errorf("logging setting unackedGroup: %v\n", err)
+			}
 			goto rereg
 		}
 	}
-
 }
 
 // ListenForGroupTasks is a method that recieves tasks from the server that are intended for groups
@@ -917,4 +931,8 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 	<-*stopListeningForResponses
 
 	return nil
+}
+
+func (rmq *rabbitMQComms) setAgentCache(ac *cache.AgentCache) {
+	rmq.ac = ac
 }
