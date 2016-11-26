@@ -12,25 +12,22 @@
 package testing
 
 import (
-	"errors"
-	"fmt"
 	"os"
+	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
-var (
-
-	// This map provides name redirection so that the native testlets can use names that don't
-	// conflict with existing system tools (i.e. using "toddping" instead of "ping") but users
-	// can still refer to the testlets using simple names.
-	//
-	// In short, users refer to the testlet by <key> and this map will redirect to the
-	// actual binary name <value>
-	nativeTestlets = map[string]string{
-		"ping": "toddping",
-	}
-)
+// This map provides name redirection so that the native testlets can use names that don't
+// conflict with existing system tools (i.e. using "toddping" instead of "ping") but users
+// can still refer to the testlets using simple names.
+//
+// In short, users refer to the testlet by <key> and this map will redirect to the
+// actual binary name <value>
+var nativeTestlets = map[string]string{
+	"ping": "toddping",
+}
 
 // Testlet defines what a testlet should look like if built in native
 // go and compiled with the agent
@@ -47,7 +44,6 @@ type Testlet interface {
 // If it is a custom testlet, then it will generate the full path to the testlet,
 // ensure it is a valid path, and if so, return that full path back to the caller.
 func GetTestletPath(testletName, optDir string) (string, error) {
-
 	if _, ok := nativeTestlets[testletName]; ok {
 		log.Debugf("%s is a native testlet", testletName)
 		return nativeTestlets[testletName], nil
@@ -56,12 +52,11 @@ func GetTestletPath(testletName, optDir string) (string, error) {
 	log.Debugf("%s is a custom testlet", testletName)
 
 	// Generate path to testlet and make sure it exists.
-	testletPath := fmt.Sprintf("%s/assets/testlets/%s", optDir, testletName)
+	testletPath := filepath.Join(optDir, "assets", "testlets", testletName)
 	if _, err := os.Stat(testletPath); err != nil {
 		log.Errorf("Problem accessing testlet %q  on this agent", testletName)
-		return "", errors.New("Error installing testrun - problem accessing testrun on agent")
+		return "", errors.Wrap(err, "verifying testlet exists")
 	}
 
 	return testletPath, nil
-
 }
