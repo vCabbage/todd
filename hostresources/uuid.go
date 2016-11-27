@@ -16,8 +16,6 @@ import (
 	"strconv"
 )
 
-var UUID []byte // TODO: appears to be unused, delete?
-
 var validShortID = regexp.MustCompile("^[a-z0-9]{12}$")
 
 // IsShortID determine if an arbitrary string *looks like* a short ID.
