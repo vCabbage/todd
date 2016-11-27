@@ -13,21 +13,20 @@ import (
 	"os"
 
 	cli "github.com/codegangsta/cli"
+	"github.com/toddproject/todd"
 	capi "github.com/toddproject/todd/api/client"
 	"github.com/toddproject/todd/server/objects"
 )
 
 func main() {
-
 	app := cli.NewApp()
 	app.Name = "todd"
-	app.Version = "v0.1.0"
+	app.Version = todd.Version
 	app.Usage = "A highly extensible framework for distributed testing on demand"
 
+	// global level flags
 	var host string
 	var port int
-
-	// global level flags
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "H, host",
@@ -43,6 +42,7 @@ func main() {
 		},
 	}
 
+	// Configure clientAPI before other commands are run
 	var clientAPI *capi.ClientAPI
 	app.Before = func(c *cli.Context) error {
 		clientAPI = capi.New(c.String("host"), c.Int("port"))
@@ -65,6 +65,7 @@ func main() {
 				err = clientAPI.DisplayAgents(agents, !(c.Args().Get(0) == ""))
 				if err != nil {
 					fmt.Println("Problem displaying agents (client-side)")
+					os.Exit(1)
 				}
 			},
 		},
@@ -74,7 +75,6 @@ func main() {
 			Name:  "create",
 			Usage: "Create ToDD object (group, testrun, etc.)",
 			Action: func(c *cli.Context) {
-
 				err := clientAPI.Create(c.Args().Get(0))
 				if err != nil {
 					fmt.Println(err)
@@ -88,10 +88,8 @@ func main() {
 			Name:  "delete",
 			Usage: "Delete ToDD object",
 			Action: func(c *cli.Context) {
-				err := clientAPI.Delete(
-					c.Args().Get(0),
-					c.Args().Get(1),
-				)
+				objType, objLabel := c.Args().Get(0), c.Args().Get(1)
+				err := clientAPI.Delete(objType, objLabel)
 				if err != nil {
 					fmt.Printf("ERROR: %s\n", err)
 					fmt.Println("(Are you sure you provided the right object type and/or label?)")
@@ -153,16 +151,13 @@ func main() {
 			},
 			Usage: "Execute an already uploaded testrun object",
 			Action: func(c *cli.Context) {
-				err := clientAPI.Run(
-					objects.SourceOverrides{
-						Group: c.String("source-group"),
-						App:   c.String("source-app"),
-						Args:  c.String("source-args"),
-					},
-					c.Args().Get(0),
-					c.Bool("j"),
-					c.Bool("y"),
-				)
+				overrides := objects.SourceOverrides{
+					Group: c.String("source-group"),
+					App:   c.String("source-app"),
+					Args:  c.String("source-args"),
+				}
+				name := c.Args().Get(0)
+				err := clientAPI.Run(overrides, name, c.Bool("j"), c.Bool("y"))
 				if err != nil {
 					fmt.Println(err)
 					os.Exit(1)

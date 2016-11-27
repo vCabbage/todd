@@ -59,34 +59,27 @@ type Package interface {
 	setAgentCache(*cache.AgentCache)
 }
 
-// toddComms is a struct to hold anything that satisfies the CommsPackage interface
-type toddComms struct {
-	Package
-}
-
 // NewToDDComms will create a new instance of toddComms, and load the desired
 // CommsPackage-compatible comms package into it.
-func NewToDDComms(cfg config.Config) (*toddComms, error) { // TODO: Return Package instead of *struct embedding Package
-
-	var tc toddComms
+func NewToDDComms(cfg config.Config) (Package, error) {
+	var tc Package
 
 	// Load the appropriate comms package based on config file
 	switch cfg.Comms.Plugin {
 	case "rabbitmq":
-		tc.Package = newRabbitMQComms(cfg)
+		tc = newRabbitMQComms(cfg)
 	default:
 		log.Error("Invalid comms plugin in config file")
 		return nil, errors.New("Invalid comms plugin in config file")
 	}
 
-	return &tc, nil
-
+	return tc, nil
 }
 
 // NewAgentComms returns a comms instance configured for agent usages.
 //
 // TODO: accept an interface for cache instead of concrete type
-func NewAgentComms(cfg config.Config, ac *cache.AgentCache) (*toddComms, error) {
+func NewAgentComms(cfg config.Config, ac *cache.AgentCache) (Package, error) {
 	comms, err := NewToDDComms(cfg)
 	if err == nil {
 		comms.setAgentCache(ac)

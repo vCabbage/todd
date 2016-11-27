@@ -95,7 +95,7 @@ next:
 			GroupName: groupName,
 		}
 
-		tc.Package.SendTask(uuid, setGroupTask)
+		tc.SendTask(uuid, setGroupTask)
 	}
 
 	// need to send a message to all agents that weren't in groupmap to set their group to nothing
@@ -105,7 +105,7 @@ next:
 			GroupName: "",
 		}
 
-		tc.Package.SendTask(lonelyAgents[x].UUID, setGroupTask)
+		tc.SendTask(lonelyAgents[x].UUID, setGroupTask)
 	}
 }
 

@@ -9,7 +9,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -20,17 +19,14 @@ import (
 	"github.com/toddproject/todd/agent/cache"
 	"github.com/toddproject/todd/agent/defs"
 	"github.com/toddproject/todd/agent/facts"
-	"github.com/toddproject/todd/agent/responses"
 	"github.com/toddproject/todd/comms"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/hostresources"
 )
 
-// Command-line Arguments
-var argConfig string
-
-func init() {
-
+func main() {
+	// Command-line Arguments
+	configPath := flag.String("config", "/etc/todd/agent.cfg", "ToDD agent config file location")
 	flag.Usage = func() {
 		fmt.Print(`Usage: todd-agent [OPTIONS] COMMAND [arg...]
 
@@ -41,19 +37,14 @@ func init() {
 
 		os.Exit(0)
 	}
-
-	flag.StringVar(&argConfig, "config", "/etc/todd/agent.cfg", "ToDD agent config file location")
 	flag.Parse()
 
 	// TODO(moswalt): Implement configurable loglevel in server and agent
 	log.SetLevel(log.DebugLevel)
-}
 
-func main() {
-
-	cfg, err := config.GetConfig(argConfig)
+	cfg, err := config.GetConfig(*configPath)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	// Set up cache
@@ -72,19 +63,16 @@ func main() {
 
 	log.Infof("ToDD Agent Activated: %s", uuid)
 
-	// Start test data reporting service
-	go watchForFinishedTestRuns(cfg, ac)
-
 	// Construct comms package
 	tc, err := comms.NewAgentComms(cfg, ac)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	// Spawn goroutine to listen for tasks issued by server
 	go func() {
 		for {
-			err := tc.Package.ListenForTasks(uuid)
+			err := tc.ListenForTasks(uuid)
 			if err != nil {
 				log.Warn("ListenForTasks reported a failure. Trying again...")
 			}
@@ -92,24 +80,32 @@ func main() {
 	}()
 
 	// Watch for changes to group membership
-	go tc.Package.WatchForGroup()
+	go tc.WatchForGroup()
 
 	// Continually advertise agent status into message queue
+	advertiseAgent(cfg, tc, uuid)
+}
+
+func advertiseAgent(cfg config.Config, tc comms.Package, uuid string) {
+	ticker := time.NewTicker(10 * time.Second) // TODO(moswalt): make configurable
 	for {
-
 		// Gather assets here as a map, and refer to a key in that map in the below struct
-		gatheredAssets := GetLocalAssets(cfg)
+		factCollectors, testlets, err := getLocalAssets(cfg.LocalResources.OptDir)
+		if err != nil {
+			log.Error("Error gathering assets:", err)
+			<-ticker.C
+			continue
+		}
 
-		var defaultaddr string
-		if cfg.LocalResources.IPAddrOverride != "" {
-			defaultaddr = cfg.LocalResources.IPAddrOverride
-		} else {
+		defaultaddr := cfg.LocalResources.IPAddrOverride
+		if defaultaddr == "" {
 			defaultaddr = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
 		}
 
 		fcts, err := facts.GetFacts(cfg)
 		if err != nil {
-			log.Errorf("Error gathering facts: %v", err)
+			log.Error("Error gathering facts:", err)
+			<-ticker.C
 			continue
 		}
 
@@ -117,56 +113,17 @@ func main() {
 		me := defs.AgentAdvert{
 			UUID:           uuid,
 			DefaultAddr:    defaultaddr,
-			FactCollectors: gatheredAssets["factcollectors"],
-			Testlets:       gatheredAssets["testlets"],
+			FactCollectors: factCollectors,
+			Testlets:       testlets,
 			Facts:          fcts,
 			LocalTime:      time.Now().UTC(),
 		}
 
 		// Advertise this agent
-		err = tc.Package.AdvertiseAgent(me)
+		err = tc.AdvertiseAgent(me)
 		if err != nil {
 			log.Error("Failed to advertise agent after several retries")
 		}
-
-		time.Sleep(10 * time.Second) // TODO(moswalt): make configurable
-	}
-
-}
-
-// watchForFinishedTestRuns simply watches the local cache for any test runs that have test data.
-// It will periodically look at the table and send any present test data back to the server as a response.
-// When the server has successfully received this data, it will send a task back to this specific agent
-// to delete this row from the cache.
-func watchForFinishedTestRuns(cfg config.Config, ac *cache.AgentCache) error {
-	agentUUID, err := ac.GetKeyValue("uuid")
-	if err != nil {
-		return err
-	}
-
-	for {
-
-		time.Sleep(5000 * time.Millisecond)
-
-		testruns, err := ac.GetFinishedTestRuns()
-		if err != nil {
-			log.Error("Problem retrieving finished test runs")
-			return errors.New("Problem retrieving finished test runs")
-		}
-
-		for testUUID, testData := range testruns {
-
-			log.Debug("Found ripe testrun: ", testUUID)
-
-			tc, err := comms.NewToDDComms(cfg)
-			if err != nil {
-				return err
-			}
-
-			utdr := responses.NewUploadTestData(agentUUID, testUUID, testData)
-			tc.Package.SendResponse(utdr)
-
-		}
-
+		<-ticker.C
 	}
 }

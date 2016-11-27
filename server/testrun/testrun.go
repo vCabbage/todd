@@ -89,7 +89,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 		os.Exit(1) //TODO(mierdin): remove
 	}
 	stopListeningForResponses := make(chan bool, 1)
-	go tc.Package.ListenForResponses(&stopListeningForResponses)
+	go tc.ListenForResponses(&stopListeningForResponses)
 
 	// Initialize test in database. This will create an entry for this test under the UUID we just created, and will also write the
 	// list of agents participating in this test, with some kind of default status, for other goroutines to update with a further status.
@@ -135,7 +135,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 	// the testrun will require a response from each agent before actually moving on with execution, but I'd like something better.
 	// Something that feels more like a true distributed system. Perfect is the enemy of good, however, and this works well for a prototype.
 	for uuid := range testAgentMap["sources"] {
-		tc.Package.SendTask(uuid, itrTask)
+		tc.SendTask(uuid, itrTask)
 	}
 
 	// If this testrun is targeted at another todd group, we want to send testrun tasks to those as well
@@ -160,7 +160,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 
 		// Send testrun to each agent UUID in the targets group
 		for uuid := range testAgentMap["targets"] {
-			tc.Package.SendTask(uuid, itrTask)
+			tc.SendTask(uuid, itrTask)
 		}
 	}
 
@@ -227,7 +227,7 @@ readyloop:
 
 		// Send testrun to each agent UUID in the targets group
 		for uuid := range testAgentMap["targets"] {
-			tc.Package.SendTask(uuid, targetTask)
+			tc.SendTask(uuid, targetTask)
 		}
 
 		// Next, we want to wait to make sure that the targets are all "testing" before instructing the source group to execute
@@ -281,7 +281,7 @@ readyloop:
 
 	// Send testrun to each agent UUID in the targets group
 	for uuid := range testAgentMap["sources"] {
-		tc.Package.SendTask(uuid, sourceTask)
+		tc.SendTask(uuid, sourceTask)
 	}
 
 	// Let's wait once more until all agents are stored in the database with a status of "finished"
@@ -335,7 +335,7 @@ finishedloop:
 		}
 
 		timeDB := tsdb.NewToddTSDB(cfg)
-		err = timeDB.Package.WriteData(testUUID, trObj.Label, trObj.Spec.Source["name"], testDataMap)
+		err = timeDB.WriteData(testUUID, trObj.Label, trObj.Spec.Source["name"], testDataMap)
 		if err != nil {
 			log.Debug(err)
 			log.Error("Problem writing metrics to TSDB")

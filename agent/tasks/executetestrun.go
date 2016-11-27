@@ -105,14 +105,8 @@ func (t *ExecuteTestRun) Run(cfg *config.Config, ac *cache.AgentCache, responder
 		// Need to figure out a more elegant way of handling this (instead of showing this message)
 	}
 
-	// Write test data to agent cache
-	err = ac.UpdateTestRunData(t.TestUUID, string(testdataJSON))
-	if err != nil {
-		log.Fatal("Failed to install post-test data into cache")
-		return errors.Wrap(err, "adding test data to cache")
-	}
-	log.Debugf("Wrote combined post-test data for %s to cache", t.TestUUID)
-
+	utdr := responses.NewUploadTestData(uuid, t.TestUUID, string(testdataJSON))
+	responder(utdr)
 	return nil
 }
 

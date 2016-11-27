@@ -12,10 +12,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/toddproject/todd"
 	toddapi "github.com/toddproject/todd/api/server"
 	"github.com/toddproject/todd/comms"
 	"github.com/toddproject/todd/config"
@@ -23,14 +25,8 @@ import (
 	"github.com/toddproject/todd/server/grouping"
 )
 
-var (
-	toddVersion = "0.0.1"
-	// Command-line Arguments
-	argVersion string
-)
-
-func init() {
-
+func main() {
+	configPath := flag.String("config", "/etc/todd/server.cfg", "ToDD server config file location")
 	flag.Usage = func() {
 		fmt.Print(`Usage: todd-server [OPTIONS] COMMAND [arg...]
 
@@ -41,17 +37,12 @@ func init() {
 
 		os.Exit(0)
 	}
-
-	flag.StringVar(&argVersion, "config", "/etc/todd/server.cfg", "ToDD server config file location")
 	flag.Parse()
 
 	// TODO(moswalt): Implement configurable loglevel in server and agent
 	log.SetLevel(log.DebugLevel)
-}
 
-func main() {
-
-	cfg, err := config.GetConfig(argVersion)
+	cfg, err := config.GetConfig(*configPath)
 	if err != nil {
 		log.Fatalf("Problem getting configuration: %v\n", err)
 	}
@@ -83,9 +74,9 @@ func main() {
 
 	go func() {
 		for {
-			err := tc.Package.ListenForAgent(assets)
+			err := tc.ListenForAgent(assets)
 			if err != nil {
-				log.Fatalf("Error listening for ToDD Agents")
+				log.Fatal("Error listening for ToDD Agents:", err)
 			}
 		}
 	}()
@@ -99,10 +90,7 @@ func main() {
 		}
 	}()
 
-	log.Infof("ToDD server v%s. Press any key to exit...\n", toddVersion)
+	log.Infof("ToDD server v%s.", todd.Version)
 
-	// Sssh, sssh, only dreams now....
-	for {
-		time.Sleep(time.Second * 10) // TODO: Replace with select{}, blocks forever without interrupt
-	}
+	runtime.Goexit() // Exit main goroutine, allow others to continue
 }
