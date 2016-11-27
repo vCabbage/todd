@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// Initialize API
-	var tapi toddapi.ToDDApi
+	var tapi toddapi.ServerAPI
 	go func() {
 		log.Fatal(tapi.Start(cfg))
 	}()

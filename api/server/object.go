@@ -10,91 +10,72 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
-
+	"github.com/toddproject/todd/api"
 	"github.com/toddproject/todd/server/objects"
 )
 
 // ListObjects will query the database layer for a slice of objects based on the parameters provided in the URL.
 // The client may ask for a specific type of object by using the "/all" notation after the object keyword in the URL,
 // or this may be a specific type, such as "/group".
-func (tapi ToDDApi) ListObjects(w http.ResponseWriter, r *http.Request) {
-
-	// See if the client is trying to list all objects
-	if r.URL.String() == "/v1/object/all" {
-		log.Warn("/v1/object/all function currently unsupported")
-		return
-	}
-
+func (s *ServerAPI) ListObjects(w http.ResponseWriter, r *http.Request) {
 	// Derive specific type from URL
-	objType := strings.Split(r.URL.String(), "/")[3]
-	objectList, err := tapi.tdb.GetObjects(objType)
+	objType := strings.Split(r.URL.Path, "/")[3]
+
+	objectList, err := s.tdb.GetObjects(objType)
 	if err != nil {
-		log.Errorln(err)
-		http.Error(w, "Internal Error", 500)
+		writeError(w, err)
 		return
 	}
 
-	response, err := json.MarshalIndent(objectList, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Fprint(w, string(response))
+	writeJSON(w, objectList)
 }
 
 // CreateObject will decode a JSON object into a proper ToddObject instance, and send that to the
 // database layer to be written persistently.
-func (tapi ToDDApi) CreateObject(w http.ResponseWriter, r *http.Request) {
-
-	// Defer the closing of the body
-	defer r.Body.Close()
-
+func (s *ServerAPI) CreateObject(w http.ResponseWriter, r *http.Request) {
 	// Read the content into a byte array
 	// (we're doing this so we can access the JSON contents more than once)
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		panic(err)
+		writeError(w, err)
+		return
 	}
 
 	// Marshal API data into BaseObject
-	var baseobj objects.BaseObject
-	err = json.Unmarshal(body, &baseobj)
+	var baseObj objects.BaseObject
+	err = json.Unmarshal(body, &baseObj)
 	if err != nil {
-		panic(err)
+		writeError(w, err)
+		return
 	}
 
 	// Generate a more specific Todd Object based on the JSON data
-	finalobj := baseobj.ParseToddObject(body)
+	finalObj := baseObj.ParseToddObject(body)
 
-	err = tapi.tdb.SetObject(finalobj)
+	err = s.tdb.SetObject(finalObj)
 	if err != nil {
-		log.Errorln(err)
-		http.Error(w, "Internal Error", 500)
+		writeError(w, err)
 		return
 	}
 }
 
 // DeleteObject will decode a JSON object from a client request to determine the type and label of the
 // object that needs to be deleted. Then, it will send this information to the database layer to delete this object.
-func (tapi ToDDApi) DeleteObject(w http.ResponseWriter, r *http.Request) {
-
-	deleteInfo := make(map[string]string)
-
+func (s *ServerAPI) DeleteObject(w http.ResponseWriter, r *http.Request) {
+	var deleteInfo api.DeleteInfo
 	err := json.NewDecoder(r.Body).Decode(&deleteInfo)
 	if err != nil {
-		log.Errorln(err)
-		http.Error(w, "Internal Error", 500)
+		writeError(w, err)
+		return
 	}
 
-	err = tapi.tdb.DeleteObject(deleteInfo["label"], deleteInfo["type"])
+	err = s.tdb.DeleteObject(deleteInfo.Label, deleteInfo.Type)
 	if err != nil {
-		log.Errorln(err)
-		http.Error(w, "Internal Error", 500)
+		writeError(w, err)
+		return
 	}
 }

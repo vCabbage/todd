@@ -14,6 +14,7 @@ import (
 
 	cli "github.com/codegangsta/cli"
 	capi "github.com/toddproject/todd/api/client"
+	"github.com/toddproject/todd/server/objects"
 )
 
 func main() {
@@ -153,9 +154,11 @@ func main() {
 			Usage: "Execute an already uploaded testrun object",
 			Action: func(c *cli.Context) {
 				err := clientAPI.Run(
-					c.String("source-group"),
-					c.String("source-app"),
-					c.String("source-args"),
+					objects.SourceOverrides{
+						Group: c.String("source-group"),
+						App:   c.String("source-app"),
+						Args:  c.String("source-args"),
+					},
 					c.Args().Get(0),
 					c.Bool("j"),
 					c.Bool("y"),

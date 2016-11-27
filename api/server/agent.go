@@ -9,22 +9,19 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
-
-	log "github.com/Sirupsen/logrus"
 
 	"github.com/toddproject/todd/agent/defs"
 )
 
-func (tapi ToDDApi) Agent(w http.ResponseWriter, r *http.Request) {
-
-	agentList, err := tapi.tdb.GetAgents()
+// Agent returns a list of agents.
+//
+// Agents can be filtered by providing the uuid query param ("?uuid=1234")
+func (s *ServerAPI) Agent(w http.ResponseWriter, r *http.Request) {
+	agentList, err := s.tdb.GetAgents()
 	if err != nil {
-		log.Errorln(err)
-		http.Error(w, "Internal Error", 500)
+		writeError(w, err)
 		return
 	}
 
@@ -40,10 +37,5 @@ func (tapi ToDDApi) Agent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	response, err := json.MarshalIndent(agentList, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Fprint(w, string(response))
+	writeJSON(w, agentList)
 }

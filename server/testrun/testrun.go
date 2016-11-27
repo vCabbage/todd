@@ -28,7 +28,7 @@ import (
 	"github.com/toddproject/todd/server/tsdb"
 )
 
-func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map[string]string) string {
+func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides) string {
 
 	// Generate UUID for test
 	testUUID := hostresources.GenerateUUID()
@@ -47,16 +47,16 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrideMap map
 	sourceOverride := false
 
 	// Override source params as necessary
-	if sourceOverrideMap["SourceApp"] != "" {
-		trObj.Spec.Source["app"] = sourceOverrideMap["SourceApp"]
+	if sourceOverrides.App != "" {
+		trObj.Spec.Source["app"] = sourceOverrides.App
 		sourceOverride = true
 	}
-	if sourceOverrideMap["SourceArgs"] != "" {
-		trObj.Spec.Source["args"] = sourceOverrideMap["SourceArgs"]
+	if sourceOverrides.Args != "" {
+		trObj.Spec.Source["args"] = sourceOverrides.Args
 		sourceOverride = true
 	}
-	if sourceOverrideMap["SourceGroup"] != "" {
-		trObj.Spec.Source["name"] = sourceOverrideMap["SourceGroup"]
+	if sourceOverrides.Group != "" {
+		trObj.Spec.Source["name"] = sourceOverrides.Group
 		sourceOverride = true
 	}
 

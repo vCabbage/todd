@@ -25,6 +25,11 @@ type TestRunObject struct {
 	} `json:"spec" yaml:"spec"`
 }
 
+// GetSpec is a simple function to return the "Spec" attribute of a TestRunObject
+func (t TestRunObject) GetSpec() string {
+	return fmt.Sprint(t.Spec)
+}
+
 // Target unmarshals YAML to either a map or a slice.
 type Target struct {
 	Map   map[string]string
@@ -53,11 +58,6 @@ func (t *Target) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	return json.Unmarshal(b, &t.Slice)
-}
-
-// GetSpec is a simple function to return the "Spec" attribute of a TestRunObject
-func (t TestRunObject) GetSpec() string {
-	return fmt.Sprint(t.Spec)
 }
 
 type SourceOverrides struct {

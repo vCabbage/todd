@@ -16,6 +16,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/toddproject/todd/api"
 )
 
 // Delete will send a request to remove an existing ToDD Object
@@ -26,12 +28,9 @@ func (c *ClientAPI) Delete(objType, objLabel string) error {
 	}
 
 	// anonymous struct to hold our delete info
-	deleteInfo := struct {
-		Label string `json:"label"`
-		Type  string `json:"type"`
-	}{
-		objLabel,
-		objType,
+	deleteInfo := api.DeleteInfo{
+		Label: objLabel,
+		Type:  objType,
 	}
 
 	// Marshal deleteinfo into JSON

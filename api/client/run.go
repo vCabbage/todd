@@ -20,10 +20,13 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/toddproject/todd/api"
+	"github.com/toddproject/todd/server/objects"
 )
 
 // Run is responsible for activating an existing testrun object
-func (c *ClientAPI) Run(sourceGroup, sourceApp, sourceArgs, testrunName string, displayReport, skipConfirm bool) error {
+func (c *ClientAPI) Run(sourceOverrides objects.SourceOverrides, testrunName string, displayReport, skipConfirm bool) error {
 	// If no subarg was provided, do nothing
 	if testrunName == "" {
 		return errors.New("Please provide testrun object name to run.")
@@ -42,17 +45,9 @@ func (c *ClientAPI) Run(sourceGroup, sourceApp, sourceArgs, testrunName string, 
 		}
 	}
 
-	// anonymous struct to hold our testRun info
-	testRunInfo := struct {
-		TestRunName string `json:"testRunName"`
-		SourceGroup string `json:"sourceGroup"`
-		SourceApp   string `json:"sourceApp"`
-		SourceArgs  string `json:"sourceArgs"`
-	}{
-		testrunName,
-		sourceGroup,
-		sourceApp,
-		sourceArgs,
+	testRunInfo := api.TestRunInfo{
+		Name:            testrunName,
+		SourceOverrides: sourceOverrides,
 	}
 
 	// Marshal the final object into JSON
@@ -123,7 +118,7 @@ func (c *ClientAPI) Run(sourceGroup, sourceApp, sourceArgs, testrunName string, 
 	fmt.Printf("\n\nDone.\n")
 
 	// display it to the user if desired
-	if sourceGroup != "" || displayReport {
+	if sourceOverrides.Group != "" || displayReport {
 		var buf bytes.Buffer
 		err := json.Indent(&buf, data, "", "  ")
 		if err != nil {
