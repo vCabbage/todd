@@ -690,7 +690,7 @@ func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) 
 			log.Debugf("Agent task received: %s", d.Body)
 
 			// call agent task method based on type
-			switch baseMsg.Type { // TODO: remove switch?
+			switch baseMsg.Type {
 
 			// This has been removed, as I am moving away from using queues that use the group name.
 
