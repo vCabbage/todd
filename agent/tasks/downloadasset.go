@@ -77,13 +77,18 @@ func (dat DownloadAssetTask) downloadAsset(url, directory string) error {
 	defer output.Close()
 
 	response, err := dat.HTTPClient.Get(url)
-	if err != nil || response.StatusCode != 200 {
+	if err != nil {
 		// If we have a problem retrieving the testlet, we want to return immediately,
 		// instead of writing an empty file to disk
-		log.Errorf("Error while downloading '%s': %s", url, response.Status)
+		log.Errorf("Error while downloading '%s': %v", url, err)
 		return err
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		log.Errorf("Error while downloading '%s': %s", url, response.Status)
+		return err
+	}
 
 	n, err := dat.Ios.Copy(output, response.Body)
 	if err != nil {
