@@ -10,6 +10,7 @@ package testrun
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -24,11 +25,12 @@ import (
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/db"
 	"github.com/toddproject/todd/hostresources"
+	"github.com/toddproject/todd/server"
 	"github.com/toddproject/todd/server/objects"
 	"github.com/toddproject/todd/server/tsdb"
 )
 
-func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides) string {
+func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server) string {
 
 	// Generate UUID for test
 	testUUID := hostresources.GenerateUUID()
@@ -84,17 +86,27 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 	}
 
 	// Start listening for responses from agents
-	tc, err := comms.NewToDDComms(cfg)
+	tc, err := comms.New(&cfg)
 	if err != nil {
 		os.Exit(1) //TODO(mierdin): remove
 	}
-	stopListeningForResponses := make(chan bool, 1)
-	go tc.ListenForResponses(&stopListeningForResponses)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	msgs, _ := tc.ListenForResponses(ctx)
+	go func() {
+		for msg := range msgs {
+			err := srv.HandleAgentResponse(msg)
+			if err != nil {
+				log.Error("Error handling agent response:", err)
+			}
+		}
+	}()
 
 	// Initialize test in database. This will create an entry for this test under the UUID we just created, and will also write the
 	// list of agents participating in this test, with some kind of default status, for other goroutines to update with a further status.
 	err = tdb.InitTestRun(testUUID, testAgentMap)
 	if err != nil {
+		cancel()
 		log.Fatal("Problem initializing testrun in database.")
 		return "failure"
 	}
@@ -153,7 +165,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 			TR:       targetTr,
 		}
 
-		tc, err := comms.NewToDDComms(cfg)
+		tc, err := comms.New(&cfg)
 		if err != nil {
 			os.Exit(1) //TODO(mierdin): remove
 		}
@@ -165,10 +177,9 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 	}
 
 	// Start monitoring service
-	leash := make(chan bool, 1)
-	go testMonitor(cfg, testUUID, &leash)
+	go testMonitor(cfg, testUUID, ctx)
 
-	go executeTestRun(testAgentMap, testUUID, trObj, cfg, &leash, &stopListeningForResponses, sourceOverride)
+	go executeTestRun(testAgentMap, testUUID, trObj, cfg, cancel, sourceOverride)
 
 	// Return the testUuid so that the client can subscribe to it.
 	return testUUID
@@ -180,7 +191,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 // - When the status for all agents is "ready", it will send execution tasks to one or both groups
 // - It will continue to monitor, and when all agents have finished, it will pull the "leash" to stop the TCP stream to the client
 // - After pulling the leash, it will call the function that will aggregate the test data and upload to a third party service
-func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg config.Config, leash, responseLeash *chan bool, sourceOverride bool) {
+func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg config.Config, done func(), sourceOverride bool) {
 
 	// Sleep for 2 seconds so that the client moniting can connect first
 	time.Sleep(2000 * time.Millisecond)
@@ -211,7 +222,7 @@ readyloop:
 		break
 	}
 
-	tc, err := comms.NewToDDComms(cfg)
+	tc, err := comms.New(&cfg)
 	if err != nil {
 		os.Exit(1) //TODO(mierdin): remove
 	}
@@ -344,9 +355,7 @@ finishedloop:
 	}
 
 	// Clean up our goroutines
-	*leash <- true
-	*responseLeash <- true
-
+	done()
 }
 
 // cleanTestData cleans up the testing data that comes back from the agents.
@@ -369,7 +378,7 @@ func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[strin
 }
 
 // testMonitor offers a basic TCP stream for the ToDD client to subscribe to in order to receive updates during the course of a test.
-func testMonitor(cfg config.Config, testUUID string, leash *chan bool) {
+func testMonitor(cfg config.Config, testUUID string, ctx context.Context) {
 
 	// I implemented this retry functionality as a temporary fix for an issue that came up only once in a while, where
 	// the net.Listen would throw an error indicating the port was already in use. Not sure why this happens yet, as I
@@ -438,7 +447,7 @@ retrytcpserver:
 		// Because of the presence of the default statement, this select statement will not block. It will allow the
 		// loop to repeat if the channel does not contain data, and if it does this function will return.
 		select {
-		case _, _ = <-*leash:
+		case <-ctx.Done():
 			log.Debug("Killed testrun monitoring goroutine")
 			return
 		default:

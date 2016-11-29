@@ -11,78 +11,50 @@
 package comms
 
 import (
-	"errors"
+	"context"
+	"fmt"
+	"sync"
 
-	log "github.com/Sirupsen/logrus"
-
-	"github.com/toddproject/todd/agent/cache"
 	"github.com/toddproject/todd/agent/defs"
 	"github.com/toddproject/todd/agent/tasks"
 	"github.com/toddproject/todd/config"
 )
 
-type assetProvider interface {
-	Assets() map[string]map[string]string
-}
-
-// Package will ensure that whatever specific comms struct is loaded at compile time will support
+// Comms will ensure that whatever specific comms struct is loaded at compile time will support
 // all of the necessary features/functions that we need to make ToDD work. In short, this interface
 // represents a list of things that the server and agents do on the message queue.
-type Package interface {
+type Comms interface {
+	// Used by server
+	ListenForAgent(context.Context) (chan []byte, error)
+	ListenForResponses(context.Context) (chan []byte, error)
+	SendTask(to string, task tasks.Task) error
 
-	// TODO(mierdin) best way to document interface or function args? I've tried to document
-	// them minimally below, but would like a better way to document the meaning behind
-	// the arguments defined here.
-
-	// (agent advertisement to advertise)
+	// Used by agent
 	AdvertiseAgent(defs.AgentAdvert) error
-
-	// (map of assets:hashes, lock for asset map)
-	ListenForAgent(assetProvider) error
-
-	// (uuid)
-	ListenForTasks(string) error
-
-	// (queuename, task)
-	SendTask(string, tasks.Task) error
-
-	// watches for new group membership instructions in the cache and reregisters
-	WatchForGroup() error
-
-	ListenForGroupTasks(string, chan bool) error
-
-	ListenForResponses(*chan bool) error
-	SendResponse(interface{}) error
-
-	// adds a cache agent to the comms package. temporary until
-	// comms package is refactored
-	setAgentCache(*cache.AgentCache)
+	ListenForTasks(from string, ctx context.Context) (chan []byte, error)
+	SendResponse(msg interface{}) error
 }
 
-// NewToDDComms will create a new instance of toddComms, and load the desired
+// New will create a new instance of toddComms, and load the desired
 // CommsPackage-compatible comms package into it.
-func NewToDDComms(cfg config.Config) (Package, error) {
-	var tc Package
-
-	// Load the appropriate comms package based on config file
-	switch cfg.Comms.Plugin {
-	case "rabbitmq":
-		tc = newRabbitMQComms(cfg)
-	default:
-		log.Error("Invalid comms plugin in config file")
-		return nil, errors.New("Invalid comms plugin in config file")
+func New(cfg *config.Config) (Comms, error) {
+	construct, ok := packages[cfg.Comms.Plugin]
+	if !ok {
+		return nil, fmt.Errorf("Invalid comms plugin %q in config file", cfg.Comms.Plugin)
 	}
 
-	return tc, nil
+	return construct(cfg)
 }
 
-// NewAgentComms returns a comms instance configured for agent usages.
-//
-// TODO: accept an interface for cache instead of concrete type
-func NewAgentComms(cfg config.Config, ac *cache.AgentCache) (Package, error) {
-	comms, err := NewToDDComms(cfg)
-	if err == nil {
-		comms.setAgentCache(ac)
-	}
-	return comms, err
+type constructor func(*config.Config) (Comms, error)
+
+var (
+	packagesMu sync.Mutex
+	packages   = make(map[string]constructor)
+)
+
+func register(name string, c constructor) {
+	packagesMu.Lock()
+	packages[name] = c
+	packagesMu.Unlock()
 }

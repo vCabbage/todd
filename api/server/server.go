@@ -15,14 +15,16 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/toddproject/todd/db"
+	"github.com/toddproject/todd/server"
 
 	"github.com/toddproject/todd/config"
 )
 
 // ServerAPI contains necessary components for server handlers.
 type ServerAPI struct {
-	cfg config.Config
-	tdb db.DatabasePackage
+	cfg    config.Config
+	tdb    db.DatabasePackage
+	Server *server.Server
 }
 
 // Start configured ServerAPI, registers handlers, and starts listening only

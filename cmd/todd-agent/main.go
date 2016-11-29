@@ -9,6 +9,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/toddproject/todd/agent/cache"
 	"github.com/toddproject/todd/agent/defs"
 	"github.com/toddproject/todd/agent/facts"
+	"github.com/toddproject/todd/agent/tasks"
 	"github.com/toddproject/todd/comms"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/hostresources"
@@ -64,29 +66,37 @@ func main() {
 	log.Infof("ToDD Agent Activated: %s", uuid)
 
 	// Construct comms package
-	tc, err := comms.NewAgentComms(cfg, ac)
+	tc, err := comms.New(&cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Spawn goroutine to listen for tasks issued by server
 	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		for {
-			err := tc.ListenForTasks(uuid)
+			tsks, err := tc.ListenForTasks(uuid, ctx)
 			if err != nil {
 				log.Warn("ListenForTasks reported a failure. Trying again...")
 			}
+
+			for body := range tsks {
+				log.Debugf("Agent task received: %s", body)
+
+				err := tasks.Run(body, &cfg, ac, tc.SendResponse)
+				if err != nil {
+					log.Warning("Error running task:", err)
+				}
+			}
 		}
 	}()
-
-	// Watch for changes to group membership
-	go tc.WatchForGroup()
 
 	// Continually advertise agent status into message queue
 	advertiseAgent(cfg, tc, uuid)
 }
 
-func advertiseAgent(cfg config.Config, tc comms.Package, uuid string) {
+func advertiseAgent(cfg config.Config, tc comms.Comms, uuid string) {
 	ticker := time.NewTicker(10 * time.Second) // TODO(moswalt): make configurable
 	for {
 		// Gather assets here as a map, and refer to a key in that map in the below struct
@@ -124,6 +134,8 @@ func advertiseAgent(cfg config.Config, tc comms.Package, uuid string) {
 		if err != nil {
 			log.Error("Failed to advertise agent after several retries")
 		}
+
+		log.Infof("AGENTADV -- %s", time.Now().UTC())
 		<-ticker.C
 	}
 }

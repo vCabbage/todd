@@ -84,7 +84,7 @@ next:
 	}
 
 	// Send notifications to each agent to let them know what group they're in, so they can cache it
-	tc, err := comms.NewToDDComms(cfg)
+	tc, err := comms.New(&cfg)
 	if err != nil {
 		log.Fatalf("Error setting up ToDD Comms during group calculation")
 	}

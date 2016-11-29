@@ -9,10 +9,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -22,6 +22,7 @@ import (
 	"github.com/toddproject/todd/comms"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/db"
+	"github.com/toddproject/todd/server"
 	"github.com/toddproject/todd/server/grouping"
 )
 
@@ -60,24 +61,30 @@ func main() {
 		log.Fatalf("Error initializing database: %v\n", err)
 	}
 
-	// Initialize API
-	var tapi toddapi.ServerAPI
-	go func() {
-		log.Fatal(tapi.Start(cfg))
-	}()
-
 	// Start listening for agent advertisements
-	tc, err := comms.NewToDDComms(cfg)
+	tc, err := comms.New(&cfg)
 	if err != nil {
 		log.Fatalf("Problem connecting to comms: %v\n", err)
 	}
 
+	srv := server.New(&cfg, tc, tdb, assets)
+
+	// Initialize API
+	tapi := toddapi.ServerAPI{Server: srv}
 	go func() {
-		for {
-			err := tc.ListenForAgent(assets)
-			if err != nil {
-				log.Fatal("Error listening for ToDD Agents:", err)
-			}
+		log.Fatal(tapi.Start(cfg))
+	}()
+
+	ctx, done := context.WithCancel(context.Background())
+	defer done()
+
+	agents, err := tc.ListenForAgent(ctx)
+	if err != nil {
+		log.Fatal("Error listening for ToDD Agents:", err)
+	}
+	go func() {
+		for msg := range agents {
+			srv.HandleAgentAdvertisement(msg)
 		}
 	}()
 
@@ -92,5 +99,5 @@ func main() {
 
 	log.Infof("ToDD server v%s.", todd.Version)
 
-	runtime.Goexit() // Exit main goroutine, allow others to continue
+	select {} // Block without interrupting CPU
 }

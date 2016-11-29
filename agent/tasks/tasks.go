@@ -9,6 +9,9 @@
 package tasks
 
 import (
+	"encoding/json"
+
+	"github.com/pkg/errors"
 	"github.com/toddproject/todd/agent/cache"
 	"github.com/toddproject/todd/config"
 )
@@ -31,4 +34,40 @@ type Responder func(interface{}) error
 // dependencies of the task, such as an HTTP handler.
 type BaseTask struct {
 	Type string `json:"type"`
+}
+
+func Run(body []byte, cfg *config.Config, ac *cache.AgentCache, responder Responder) error {
+	// Unmarshal into BaseTaskMessage to determine type
+	var baseMsg BaseTask
+	err := json.Unmarshal(body, &baseMsg)
+	if err != nil {
+		return errors.Wrap(err, "unmarshaling BaseTask")
+	}
+
+	var task Task
+	// call agent task method based on type
+	switch baseMsg.Type {
+	case "DownloadAsset":
+		task = &DownloadAsset{}
+	case "KeyValue":
+		task = &KeyValue{}
+	case "SetGroup":
+		task = &SetGroup{}
+	case "DeleteTestData":
+		task = &DeleteTestData{}
+	case "InstallTestRun":
+		task = &InstallTestRun{}
+	case "ExecuteTestRun":
+		task = &ExecuteTestRun{}
+	default:
+		return errors.Errorf("Unexpected type value for received task: %v", baseMsg.Type)
+	}
+
+	err = json.Unmarshal(body, task)
+	if err != nil {
+		return errors.Wrapf(err, "unmarshaling %T", task)
+	}
+
+	err = task.Run(cfg, ac, responder)
+	return errors.Wrap(err, "running task")
 }
