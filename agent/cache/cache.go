@@ -38,7 +38,7 @@ type AgentCache struct {
 }
 
 // Open initializes and returns a new AgentCache.
-func Open(cfg config.Config) (*AgentCache, error) {
+func Open(cfg *config.Config) (*AgentCache, error) {
 
 	dbLoc := filepath.Join(cfg.LocalResources.OptDir, "agent_cache.db")
 

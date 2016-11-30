@@ -30,7 +30,7 @@ import (
 	"github.com/toddproject/todd/server/tsdb"
 )
 
-func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server) string {
+func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server) string {
 
 	// Generate UUID for test
 	testUUID := hostresources.GenerateUUID()
@@ -86,7 +86,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 	}
 
 	// Start listening for responses from agents
-	tc, err := comms.New(&cfg)
+	tc, err := comms.New(cfg)
 	if err != nil {
 		os.Exit(1) //TODO(mierdin): remove
 	}
@@ -165,7 +165,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 			TR:       targetTr,
 		}
 
-		tc, err := comms.New(&cfg)
+		tc, err := comms.New(cfg)
 		if err != nil {
 			os.Exit(1) //TODO(mierdin): remove
 		}
@@ -191,7 +191,7 @@ func Start(cfg config.Config, trObj objects.TestRunObject, sourceOverrides objec
 // - When the status for all agents is "ready", it will send execution tasks to one or both groups
 // - It will continue to monitor, and when all agents have finished, it will pull the "leash" to stop the TCP stream to the client
 // - After pulling the leash, it will call the function that will aggregate the test data and upload to a third party service
-func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg config.Config, done func(), sourceOverride bool) {
+func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg *config.Config, done func(), sourceOverride bool) {
 
 	// Sleep for 2 seconds so that the client moniting can connect first
 	time.Sleep(2000 * time.Millisecond)
@@ -222,7 +222,7 @@ readyloop:
 		break
 	}
 
-	tc, err := comms.New(&cfg)
+	tc, err := comms.New(cfg)
 	if err != nil {
 		os.Exit(1) //TODO(mierdin): remove
 	}
@@ -378,7 +378,7 @@ func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[strin
 }
 
 // testMonitor offers a basic TCP stream for the ToDD client to subscribe to in order to receive updates during the course of a test.
-func testMonitor(cfg config.Config, testUUID string, ctx context.Context) {
+func testMonitor(cfg *config.Config, testUUID string, ctx context.Context) {
 
 	// I implemented this retry functionality as a temporary fix for an issue that came up only once in a while, where
 	// the net.Listen would throw an error indicating the port was already in use. Not sure why this happens yet, as I

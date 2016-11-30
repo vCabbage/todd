@@ -30,7 +30,7 @@ type toddTSDB struct {
 
 // NewToddTSDB will create a new instance of toddTSDB, and load the desired
 // databasePackage-compatible comms package into it.
-func NewToddTSDB(cfg config.Config) *toddTSDB { // TODO: return Package instead of *struct embedding Package
+func NewToddTSDB(cfg *config.Config) *toddTSDB { // TODO: return Package instead of *struct embedding Package
 
 	// Create toddTSDB instance
 	var tsdb toddTSDB

@@ -20,14 +20,14 @@ import (
 
 // newInfluxDB is a factory function that produces a new instance of influxDB with the configuration
 // loaded and ready to be used.
-func newInfluxDB(cfg config.Config) *influxDB {
+func newInfluxDB(cfg *config.Config) *influxDB {
 	var ifdb influxDB
 	ifdb.config = cfg
 	return &ifdb
 }
 
 type influxDB struct {
-	config config.Config
+	config *config.Config
 }
 
 // WriteData will write the resulting testrun data to influxdb as a batch of points - containing

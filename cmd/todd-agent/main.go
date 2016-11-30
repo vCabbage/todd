@@ -46,7 +46,7 @@ func main() {
 
 	cfg, err := config.GetConfig(*configPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error retrieving configuration at %q: %v", *configPath, err)
 	}
 
 	// Set up cache
@@ -66,7 +66,7 @@ func main() {
 	log.Infof("ToDD Agent Activated: %s", uuid)
 
 	// Construct comms package
-	tc, err := comms.New(&cfg)
+	tc, err := comms.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func main() {
 			for body := range tsks {
 				log.Debugf("Agent task received: %s", body)
 
-				err := tasks.Run(body, &cfg, ac, tc.SendResponse)
+				err := tasks.Run(body, cfg, ac, tc.SendResponse)
 				if err != nil {
 					log.Warning("Error running task:", err)
 				}
@@ -96,7 +96,7 @@ func main() {
 	advertiseAgent(cfg, tc, uuid)
 }
 
-func advertiseAgent(cfg config.Config, tc comms.Comms, uuid string) {
+func advertiseAgent(cfg *config.Config, tc comms.Comms, uuid string) {
 	ticker := time.NewTicker(10 * time.Second) // TODO(moswalt): make configurable
 	for {
 		// Gather assets here as a map, and refer to a key in that map in the below struct

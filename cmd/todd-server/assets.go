@@ -39,7 +39,7 @@ type assetConfig struct {
 // newAssetConfig configures and returns an assetConfig. It also starts a
 // goroutine that periodically updates the assetMap and a seperate goroutine
 // providing HTTP access to the assets.
-func newAssetConfig(cfg config.Config) *assetConfig {
+func newAssetConfig(cfg *config.Config) *assetConfig {
 	// Derive directory for assets on server
 	a := &assetConfig{
 		// Derive directory for assets on server

@@ -26,7 +26,7 @@ import (
 
 // newEtcdDB is a factory function that produces a new instance of etcdDB with the configuration
 // loaded and ready to be used.
-func newEtcdDB(cfg config.Config) *etcdDB {
+func newEtcdDB(cfg *config.Config) *etcdDB {
 	etcdLoc := fmt.Sprintf("http://%s:%s", cfg.DB.Host, cfg.DB.Port)
 	etcdCfg := client.Config{
 		Endpoints: []string{etcdLoc},
@@ -44,7 +44,7 @@ func newEtcdDB(cfg config.Config) *etcdDB {
 }
 
 type etcdDB struct {
-	config  config.Config
+	config  *config.Config
 	keysAPI client.KeysAPI
 }
 

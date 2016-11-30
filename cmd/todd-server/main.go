@@ -62,12 +62,12 @@ func main() {
 	}
 
 	// Start listening for agent advertisements
-	tc, err := comms.New(&cfg)
+	tc, err := comms.New(cfg)
 	if err != nil {
 		log.Fatalf("Problem connecting to comms: %v\n", err)
 	}
 
-	srv := server.New(&cfg, tc, tdb, assets)
+	srv := server.New(cfg, tc, tdb, assets)
 
 	// Initialize API
 	tapi := toddapi.ServerAPI{Server: srv}

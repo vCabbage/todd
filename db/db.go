@@ -57,7 +57,7 @@ type DatabasePackage interface {
 
 // NewToddDB will create a new instance of toddDatabase, and load the desired
 // databasePackage-compatible comms package into it.
-func NewToddDB(cfg config.Config) (DatabasePackage, error) {
+func NewToddDB(cfg *config.Config) (DatabasePackage, error) {
 
 	// Create toddDatabase instance
 	var tdb DatabasePackage

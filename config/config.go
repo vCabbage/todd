@@ -8,10 +8,7 @@
 
 package config
 
-import (
-	log "github.com/Sirupsen/logrus"
-	"gopkg.in/gcfg.v1"
-)
+import "gopkg.in/gcfg.v1"
 
 type API struct {
 	Host string
@@ -70,14 +67,8 @@ type Config struct {
 	LocalResources LocalResources
 }
 
-func GetConfig(cfgpath string) (Config, error) {
+func GetConfig(cfgpath string) (*Config, error) {
 	var cfg Config
-
 	err := gcfg.ReadFileInto(&cfg, cfgpath)
-	if err != nil {
-		log.Errorf("Error retrieving configuration at %s", cfgpath)
-		log.Error(err)
-	}
-
-	return cfg, err
+	return &cfg, err
 }
