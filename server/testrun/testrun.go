@@ -12,7 +12,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"net"
 	"os"
 	"time"
@@ -30,16 +29,12 @@ import (
 	"github.com/toddproject/todd/server/tsdb"
 )
 
-func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server) string {
+func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server, tdb db.Database) string {
 
 	// Generate UUID for test
 	testUUID := hostresources.GenerateUUID()
 
 	// Retrieve current group map
-	tdb, err := db.NewToddDB(cfg)
-	if err != nil {
-		log.Fatalf("Error connecting to DB: %v", err)
-	}
 	allGroupMap, err := tdb.GetGroupMap()
 	if err != nil {
 		log.Fatalf("Error retrieving group map: %v", err)
@@ -177,9 +172,9 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 	}
 
 	// Start monitoring service
-	go testMonitor(cfg, testUUID, ctx)
+	go testMonitor(cfg, tdb, testUUID, ctx)
 
-	go executeTestRun(testAgentMap, testUUID, trObj, cfg, cancel, sourceOverride)
+	go executeTestRun(testAgentMap, testUUID, trObj, cfg, tdb, cancel, sourceOverride)
 
 	// Return the testUuid so that the client can subscribe to it.
 	return testUUID
@@ -191,15 +186,10 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 // - When the status for all agents is "ready", it will send execution tasks to one or both groups
 // - It will continue to monitor, and when all agents have finished, it will pull the "leash" to stop the TCP stream to the client
 // - After pulling the leash, it will call the function that will aggregate the test data and upload to a third party service
-func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg *config.Config, done func(), sourceOverride bool) {
+func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg *config.Config, tdb db.Database, done func(), sourceOverride bool) {
 
 	// Sleep for 2 seconds so that the client moniting can connect first
 	time.Sleep(2000 * time.Millisecond)
-
-	tdb, err := db.NewToddDB(cfg) // TODO(vcabbage): Pass tdb in instead of creating new connection?
-	if err != nil {
-		log.Fatalf("Error connecting to DB: %v", err)
-	}
 
 	// First, let's just keep retrieving statuses until all of the agents are reporting ready
 readyloop:
@@ -316,69 +306,28 @@ finishedloop:
 		break
 	}
 
-	uncondensedData, err := tdb.GetAgentTestData(testUUID, trObj.Spec.Source["name"])
+	if sourceOverride {
+		done()
+	}
+
+	testData, err := tdb.GetTestData(testUUID)
 	if err != nil {
 		log.Fatalf("Error retrieving agent test data: %v", err)
 	}
 
-	cleanDataMap, err := cleanTestData(uncondensedData)
+	timeDB := tsdb.NewToddTSDB(cfg)
+	err = timeDB.WriteData(testUUID, trObj.Label, trObj.Spec.Source["name"], testData)
 	if err != nil {
-		log.Error("Failed to unmarshal raw test data")
-		os.Exit(1)
-	}
-
-	cleanDataJSON, err := json.Marshal(cleanDataMap)
-	if err != nil {
-		log.Error("Problem converting cleaned data to JSON")
-		os.Exit(1)
-	}
-
-	// Write clean test data to etcd
-	tdb.WriteCleanTestData(testUUID, string(cleanDataJSON))
-
-	time.Sleep(1000 * time.Millisecond)
-
-	if !sourceOverride {
-		testDataMap := make(map[string]map[string]map[string]interface{})
-		err = json.Unmarshal(cleanDataJSON, &testDataMap)
-		if err != nil {
-			panic("Problem converting post-test data to a map")
-		}
-
-		timeDB := tsdb.NewToddTSDB(cfg)
-		err = timeDB.WriteData(testUUID, trObj.Label, trObj.Spec.Source["name"], testDataMap)
-		if err != nil {
-			log.Debug(err)
-			log.Error("Problem writing metrics to TSDB")
-		}
-
+		log.Debug(err)
+		log.Error("Problem writing metrics to TSDB")
 	}
 
 	// Clean up our goroutines
 	done()
 }
 
-// cleanTestData cleans up the testing data that comes back from the agents.
-// The test data that comes back raw from the agents is "dirty", meaning it is designed to be as flexible
-// as possible.
-func cleanTestData(dirtyData map[string]string) (map[string]map[string]map[string]interface{}, error) {
-
-	retMap := make(map[string]map[string]map[string]interface{})
-	for sourceUUID, agentData := range dirtyData {
-		var agentMap map[string]map[string]interface{}
-
-		err := json.Unmarshal([]byte(agentData), &agentMap)
-		if err != nil {
-			return nil, errors.New("Failed to unmarshal raw test data")
-		}
-		retMap[sourceUUID] = agentMap
-	}
-
-	return retMap, nil
-}
-
 // testMonitor offers a basic TCP stream for the ToDD client to subscribe to in order to receive updates during the course of a test.
-func testMonitor(cfg *config.Config, testUUID string, ctx context.Context) {
+func testMonitor(cfg *config.Config, tdb db.Database, testUUID string, ctx context.Context) {
 
 	// I implemented this retry functionality as a temporary fix for an issue that came up only once in a while, where
 	// the net.Listen would throw an error indicating the port was already in use. Not sure why this happens yet, as I
@@ -410,11 +359,6 @@ retrytcpserver:
 		goto retrytcpserver
 	}
 	defer conn.Close()
-
-	tdb, err := db.NewToddDB(cfg)
-	if err != nil {
-		log.Fatalf("Error opening database: %v", err)
-	}
 
 	// Constantly poll for test status, and send statuses to client
 	for {

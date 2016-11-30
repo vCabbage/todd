@@ -66,7 +66,7 @@ func (s *ServerAPI) Run(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send back the testrun UUID
-	testUUID := testrun.Start(s.cfg, finalObj.(objects.TestRunObject), testRunInfo.SourceOverrides, s.Server)
+	testUUID := testrun.Start(s.cfg, finalObj.(objects.TestRunObject), testRunInfo.SourceOverrides, s.Server, s.tdb)
 	fmt.Fprint(w, testUUID)
 }
 
@@ -81,7 +81,7 @@ func (s *ServerAPI) TestData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	testData, err := s.tdb.GetCleanTestData(testUUID)
+	testData, err := s.tdb.GetTestData(testUUID)
 	if err != nil {
 		if err == db.ErrNotExist {
 			http.Error(w, "Error, test UUID not found.", 404)
@@ -91,5 +91,5 @@ func (s *ServerAPI) TestData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(testData))
+	writeJSON(w, testData)
 }

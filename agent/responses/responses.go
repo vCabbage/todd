@@ -42,11 +42,11 @@ func NewSetAgentStatus(agentUUID, testUUID, status string) SetAgentStatus {
 // UploadTestData defines this particular response.
 type UploadTestData struct {
 	Base
-	TestUUID string `json:"test_uuid"`
-	TestData string `json:"test_data"`
+	TestUUID string                            `json:"test_uuid"`
+	TestData map[string]map[string]interface{} `json:"test_data"`
 }
 
-func NewUploadTestData(agentUUID, testUUID, testData string) UploadTestData {
+func NewUploadTestData(agentUUID, testUUID string, testData map[string]map[string]interface{}) UploadTestData {
 	return UploadTestData{
 		Base:     Base{AgentUUID: agentUUID, Type: KeyUploadTestData},
 		TestUUID: testUUID,

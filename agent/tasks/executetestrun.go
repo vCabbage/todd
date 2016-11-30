@@ -33,7 +33,8 @@ type ExecuteTestRun struct {
 
 type executeResult struct {
 	target string
-	data   json.RawMessage
+	data   map[string]interface{}
+	// TODO: handle errors during test run
 }
 
 // Run contains the logic necessary to perform this task on the agent. This particular task will execute a
@@ -90,22 +91,15 @@ func (t *ExecuteTestRun) Run(cfg *config.Config, ac *cache.AgentCache, responder
 	// gatheredData represents test data from this agent for all targets.
 	// Key is target name, value is JSON output from testlet for that target
 	// This is reset to a blank map every time ExecuteTestRunTask is called
-	gatheredData := map[string]*json.RawMessage{}
+	gatheredData := make(map[string]map[string]interface{})
 	for range tr.Targets {
 		result := <-results
 		if result.data != nil {
-			gatheredData[result.target] = &result.data
+			gatheredData[result.target] = result.data
 		}
 	}
 
-	testdataJSON, err := json.Marshal(gatheredData)
-	if err != nil {
-		log.Errorf("Failed to marshal post-test data %v", err)
-		// TODO(mierdin): This gets triggered for all iperf servers, because they don't provide metrics.
-		// Need to figure out a more elegant way of handling this (instead of showing this message)
-	}
-
-	utdr := responses.NewUploadTestData(uuid, t.TestUUID, string(testdataJSON))
+	utdr := responses.NewUploadTestData(uuid, t.TestUUID, gatheredData)
 	responder(utdr)
 	return nil
 }
@@ -158,6 +152,9 @@ func (t *ExecuteTestRun) executeTestRun(target, path, args string, results chan 
 	log.Debugf("Testlet %s completed without error", path)
 
 	// Record test data
-	r.data = json.RawMessage(cmdOutput.Bytes())
+	err := json.NewDecoder(cmdOutput).Decode(&r.data)
+	if err != nil {
+		log.Errorf("Error decoding output from '%s %s %s': %v", path, target, args, err)
+	}
 	results <- r
 }

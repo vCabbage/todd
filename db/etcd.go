@@ -10,13 +10,13 @@ package db
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
+	"path"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	"github.com/toddproject/todd/agent/defs"
@@ -24,23 +24,27 @@ import (
 	"github.com/toddproject/todd/server/objects"
 )
 
+const (
+	keyAgents   = "/todd/agents"
+	keyGroupMap = "/todd/groupmap"
+	keyObjects  = "/todd/objects"
+	keyTestRuns = "/todd/testruns"
+)
+
+func init() {
+	register("etcd", newEtcdDB)
+}
+
 // newEtcdDB is a factory function that produces a new instance of etcdDB with the configuration
 // loaded and ready to be used.
-func newEtcdDB(cfg *config.Config) *etcdDB {
-	etcdLoc := fmt.Sprintf("http://%s:%s", cfg.DB.Host, cfg.DB.Port)
-	etcdCfg := client.Config{
-		Endpoints: []string{etcdLoc},
-		Transport: client.DefaultTransport,
-		// set timeout per request to fail fast when the target endpoint is unavailable
-		HeaderTimeoutPerRequest: time.Second,
-	}
-	c, err := client.New(etcdCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	kapi := client.NewKeysAPI(c)
+func newEtcdDB(cfg *config.Config) (Database, error) {
+	db := &etcdDB{config: cfg}
 
-	return &etcdDB{config: cfg, keysAPI: kapi}
+	if err := db.init(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 type etcdDB struct {
@@ -48,151 +52,117 @@ type etcdDB struct {
 	keysAPI client.KeysAPI
 }
 
-func (etcddb *etcdDB) Init() error {
-
-	_, err := etcddb.keysAPI.Get(context.Background(), "/todd/agents", &client.GetOptions{Recursive: true})
-	if err == nil {
-		log.Info("Deleting '/todd/agents' key")
-		_, err = etcddb.keysAPI.Delete(context.Background(), "/todd/agents", &client.DeleteOptions{Recursive: true, Dir: true})
-		if err != nil {
-			return err
-		}
+func (db *etcdDB) init() error {
+	url := fmt.Sprintf("http://%s:%s", db.config.DB.Host, db.config.DB.Port)
+	cfg := client.Config{
+		Endpoints: []string{url},
+		// set timeout per request to fail fast when the target endpoint is unavailable
+		HeaderTimeoutPerRequest: time.Second,
 	}
+
+	c, err := client.New(cfg)
+	if err != nil {
+		return errors.Wrap(err, "creating new etcd client")
+	}
+
+	db.keysAPI = client.NewKeysAPI(c)
 
 	// TODO(mierdin): Consider deleting the entire /todd key here, and recreating all of the various subkeys, just to start from scratch.
 	// Shouldn't need any previous data if you restart the server.
+	err = db.remove(keyAgents)
+	if err != nil && err != ErrNotExist {
+		return err
+	}
 
 	return nil
 }
 
 // SetAgent will ingest an agent advertisement, and update or insert the agent record
 // in the database as needed.
-func (etcddb *etcdDB) SetAgent(adv defs.AgentAdvert) error {
-	log.Infof("Setting '/todd/agents/%s' key", adv.UUID)
-
-	advJSON, err := json.Marshal(adv)
-	if err != nil {
-		log.Error("Problem converting Agent Advertisement to JSON")
-		return err
+func (db *etcdDB) SetAgent(adv defs.AgentAdvert) error {
+	key := path.Join(keyAgents, adv.UUID)
+	resp, err := db.setJSON(key, adv, &client.SetOptions{TTL: time.Second * 30}) // TODO(mierdin): TTL needs to be user-configurable
+	if err == nil {
+		log.Infof("Agent set in etcd. This advertisement is good until %s", resp.Node.Expiration)
 	}
-
-	// TODO(mierdin): TTL needs to be user-configurable
-	resp, err := etcddb.keysAPI.Set(
-		context.Background(),                      // context
-		fmt.Sprintf("/todd/agents/%s", adv.UUID),  // key
-		string(advJSON),                           // value
-		&client.SetOptions{TTL: time.Second * 30}, //optional args
-	)
-	if err != nil {
-		log.Error("Problem setting agent in etcd")
-		return err
-	}
-
-	log.Infof("Agent set in etcd. This advertisement is good until %s", resp.Node.Expiration)
-
-	return nil
+	return err
 }
 
 // GetAgent will retrieve a specific agent from the database by UUID
-func (etcddb *etcdDB) GetAgent(uuid string) (*defs.AgentAdvert, error) {
-	keyStr := fmt.Sprintf("/todd/agents/%s", uuid)
-
-	log.Printf("Getting %q key value", keyStr)
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
+func (db *etcdDB) GetAgent(uuid string) (*defs.AgentAdvert, error) {
+	key := path.Join(keyAgents, uuid)
+	node, err := db.get(key)
 	if err != nil {
-		log.Errorf("Agent %s not found.", uuid)
+		if err == ErrNotExist {
+			log.Errorf("Agent %s not found.", uuid)
+		}
 		return nil, err
 	}
 
-	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
-
-	adv, err := nodeToAgentAdvert(resp.Node, uuid)
-	if err != nil {
-		return nil, err
-	}
-
-	return adv, nil
+	return nodeToAgentAdvert(node, uuid)
 }
 
 // nodeToAgentAdvert takes a etcd Node representing an AgentAdvert and returns an AgentAdvert
 func nodeToAgentAdvert(node *client.Node, expectedUUID string) (*defs.AgentAdvert, error) {
-	adv := new(defs.AgentAdvert)
-
 	// Marshal API data into object
-	err := json.Unmarshal([]byte(node.Value), adv)
-	if err != nil {
-		log.Error("Failed to unmarshal json into agent advertisement")
-		return nil, err
+	adv := defs.AgentAdvert{
+		Expires: node.TTLDuration(), // We want to use the TTLDuration field from etcd for simplicity
 	}
-
-	// We want to use the TTLDuration field from etcd for simplicity
-	adv.Expires = node.TTLDuration()
+	err := json.Unmarshal([]byte(node.Value), &adv)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshaling to JSON")
+	}
 
 	// The etcd key should always match the inner JSON
 	if expectedUUID != adv.UUID {
 		return nil, errors.New("UUID in etcd does not match inner JSON text")
 	}
 
-	return adv, nil
+	return &adv, nil
 }
 
 // GetAgents will retrieve all agents from the database
-func (etcddb *etcdDB) GetAgents() ([]defs.AgentAdvert, error) {
+func (db *etcdDB) GetAgents() ([]defs.AgentAdvert, error) {
+	adverts := []defs.AgentAdvert{}
 
-	retAdv := []defs.AgentAdvert{}
-
-	log.Print("Getting /todd/agents' key value")
-
-	keyStr := "/todd/agents"
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
+	node, err := db.get(keyAgents)
 	if err != nil {
-		log.Warn("Agent list empty when queried")
-		return retAdv, nil
+		if err == ErrNotExist {
+			log.Warn("Agent list empty when queried")
+			return adverts, nil
+		}
+		return nil, err
 	}
 
-	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
-
-	if !resp.Node.Dir {
+	if !node.Dir {
 		return nil, errors.New("Expected dir in etcd for agents - encountered single node")
 	}
 
-	for _, node := range resp.Node.Nodes {
-
+	for _, node := range node.Nodes {
 		// Extract UUID from key string
-		uuid := strings.Replace(node.Key, "/todd/agents/", "", 1)
+		uuid := path.Base(node.Key)
 
 		adv, err := nodeToAgentAdvert(node, uuid)
 		if err != nil {
 			return nil, err
 		}
 
-		retAdv = append(retAdv, *adv)
-
+		adverts = append(adverts, *adv)
 	}
 
-	return retAdv, nil
+	return adverts, nil
 
 }
 
 // RemoveAgent will delete an agent advertisement present in etcd. This function exists for the rare situation when
 // an Agent needs to be removed immediately, as opposed to simply waiting for the TTL to expire.
-func (etcddb *etcdDB) RemoveAgent(adv defs.AgentAdvert) error {
-	_, err := etcddb.keysAPI.Delete(context.Background(), fmt.Sprintf("/todd/agents/%s", adv.UUID), &client.DeleteOptions{Recursive: true, Dir: true})
-	if err != nil {
-		return err
-	}
-
-	log.Infof("Removed '/todd/agents/%s' key", adv.UUID)
-
-	return nil
+func (db *etcdDB) RemoveAgent(uuid string) error {
+	return db.remove(path.Join(keyAgents, uuid))
 }
 
 // GetObjects retrieves a list of ToddObjects stored within etcd, and returns this as a slice.
 // This requires an "objType" string to specify the type of object being looked up.
-func (etcddb *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
-
+func (db *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
 	retObj := []objects.ToddObject{}
 
 	// Construct the path to the key depending on the objType param
@@ -202,27 +172,24 @@ func (etcddb *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
 	}
 
 	//Construct a path to the key based on the provided type
-	keyStr := fmt.Sprintf("/todd/objects/%s/", objType)
-
-	log.Info("Accessing objects at", keyStr)
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
+	node, err := db.get(path.Join(keyObjects, objType))
 	if err != nil {
-		log.Warn("ToDD object store empty when queried")
-		return retObj, nil
+		if err == ErrNotExist {
+			log.Warn("ToDD object store empty when queried")
+			return retObj, nil
+		}
+		return nil, err
 	}
 
-	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
-
 	// We are expecting that this node is a directory
-	if !resp.Node.Dir {
+	if !node.Dir {
 		// We are definitely expecting an ETCd directory, so we should return nothing if this is not the case.
 		return nil, errors.New("Etcd query for objects did not result in a directory as expected")
 	}
 
 	// Iterate over found objects
-	for _, node := range resp.Node.Nodes {
-		log.Printf("Parsing object %s \n", node.Value)
+	for _, node := range node.Nodes {
+		log.Printf("Parsing object %s", node.Value)
 
 		// Marshal API data into ToddObject
 		var baseobj objects.BaseObject
@@ -241,240 +208,128 @@ func (etcddb *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
 }
 
 // SetObject will insert or update a ToddObject within etcd
-func (etcddb *etcdDB) SetObject(tobj objects.ToddObject) error {
-
-	objJSON, err := json.Marshal(tobj)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("Setting '/todd/objects/%s/%s' key", tobj.GetType(), tobj.GetLabel())
-
-	// Here, we set the key string, using the following format:
-	// /todd/objects/<type>/<label(name)>
-	keyStr := fmt.Sprintf("/todd/objects/%s/%s", tobj.GetType(), tobj.GetLabel())
-
-	_, err = etcddb.keysAPI.Set(
-		context.Background(), // context
-		keyStr,               // key
-		string(objJSON),      // value
-		nil,                  //optional args
-	)
+func (db *etcdDB) SetObject(tobj objects.ToddObject) error {
+	key := path.Join(keyObjects, tobj.GetType(), tobj.GetLabel())
+	_, err := db.setJSON(key, tobj, nil)
 	if err != nil {
 		log.Error("Problem setting object in etcd")
-		return err
 	}
-
-	log.Infof("Wrote new Todd Object to etcd: %s/%s", tobj.GetType(), tobj.GetLabel())
-	return nil
+	return err
 }
 
 // DeleteObject will delete a ToddObject from etcd
-func (etcddb *etcdDB) DeleteObject(label string, objtype string) error {
-	_, err := etcddb.keysAPI.Delete(context.Background(), fmt.Sprintf("/todd/objects/%s/%s", objtype, label), &client.DeleteOptions{Recursive: true, Dir: true})
-	if err != nil {
-		return err
-	}
-
-	log.Infof("Removed '/todd/objects/%s/%s' key", objtype, label)
-
-	return nil
+func (db *etcdDB) DeleteObject(label string, objType string) error {
+	return db.remove(path.Join(keyObjects, objType, label))
 }
 
 // SetGroupMapping will update etcd with the results of a grouping calculation
-func (etcddb *etcdDB) SetGroupMap(groupmap map[string]string) error {
-
-	gmapJSON, err := json.Marshal(groupmap)
-	if err != nil {
-		log.Error("Problem converting group map to JSON")
-		return err
-	}
-
-	log.Debug("Setting '/todd/groupmap' key")
-
-	keyStr := "/todd/groupmap"
-
-	_, err = etcddb.keysAPI.Set(
-		context.Background(), // context
-		keyStr,               // key
-		string(gmapJSON),     // value
-		nil,                  //optional args
-	)
+func (db *etcdDB) SetGroupMap(groupmap map[string]string) error {
+	_, err := db.setJSON(keyGroupMap, groupmap, nil)
 	if err != nil {
 		log.Error("Problem setting group map in etcd")
-		return err
 	}
-
-	log.Infof("Updated group map in etcd: %s", gmapJSON)
-
-	return nil
+	return err
 }
 
 // GetGroupMap returns a map containing agent-to-group mappings. Agent UUIDs are used for keys
-func (etcddb *etcdDB) GetGroupMap() (map[string]string, error) {
-
+func (db *etcdDB) GetGroupMap() (map[string]string, error) {
 	retMap := map[string]string{}
 
-	keyStr := "/todd/groupmap"
-
-	log.Debug("Retrieving group map")
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
+	node, err := db.get(keyGroupMap)
 	if err != nil {
 		log.Warnf("Error retrieving group mapping: %v", err)
 		return retMap, nil
 	}
 
 	// Marshal etcd data into map
-	err = json.Unmarshal([]byte(resp.Node.Value), &retMap)
-	if err != nil {
-		log.Error("Failed to retrieve group map from etcd")
-		return nil, err
-	}
-
-	return retMap, nil
+	err = json.Unmarshal([]byte(node.Value), &retMap)
+	return retMap, errors.Wrap(err, "unmarshaling JSON")
 }
 
 // InitTestRun is responsible for initializing a new test run within the database. This includes creating an entry for the test itself
 // using the provided UUID for uniqueness, but also in the case of etcd, a nested entry for each agent participating in the test. Each
 // Agent entry will be initially populated with that agent's current group and an initial status, but it will also house the result of
 // that agent's testrun data, which will be aggregate dafter all agents have checked back in.
-func (etcddb *etcdDB) InitTestRun(testUUID string, testAgentMap map[string]map[string]string) error {
-
+func (db *etcdDB) InitTestRun(testUUID string, testAgentMap map[string]map[string]string) error {
 	// Create high-level UUID key for this testrun
 	log.Debug("Creating entry in etcd for testrun ", testUUID)
-	_, err := etcddb.keysAPI.Set(
-		context.Background(),                       // context
-		fmt.Sprintf("/todd/testruns/%s", testUUID), // key
-		"", // value
-		&client.SetOptions{Dir: true, TTL: time.Second * 3000}, //optional args
-		// TODO(mierdin): I set the TTL here so that I didn't dirty etcd with a bunch of old testruns while I develop this feature.
-		// Need to decide if doing our own garbage collection is a better approach.
-	)
+	testrunKey := path.Join(keyTestRuns, testUUID)
+	err := db.createDir(testrunKey)
 	if err != nil {
-		log.Error("Problem setting testrun UUID: ", testUUID)
-		return err
+		return errors.Wrapf(err, "creating directory %q", testrunKey)
 	}
 
 	// TODO(vcabbage): Parallelize this?
 	// Create agent entry for each agent that is in the provided map
 	for _, uuidmappings := range testAgentMap {
-
 		// _ is either "targets" or "sources".
 		// uuidmappings is a map[string]string that contains uuid (key) to group name (value) mappings for this test.
-
 		for agent, group := range uuidmappings {
 			// Create agent entry within this testrun
 			log.Debugf("Creating agent entry within testrun %s for agent %s", testUUID, agent)
-			_, err = etcddb.keysAPI.Set(
-				context.Background(),                                        // context
-				fmt.Sprintf("/todd/testruns/%s/agents/%s", testUUID, agent), // key
-				"", // value
-				&client.SetOptions{Dir: true}, //optional args
-			)
+			key := path.Join(testrunKey, "agents", agent)
+			err = db.createDir(key)
 			if err != nil {
-				log.Error("Problem setting initial agent placeholder in testrun: ", testUUID)
-				log.Error(err)
-				return err
+				return errors.Wrapf(err, "creating directory %q", key)
 			}
 
-			var initAgentProps = map[string]string{
+			initAgentProps := map[string]string{
 				"group":  group,
 				"status": "init",
 				// Intentially omitting the "testdata" key here, because we will create it when the testdata is ready
 			}
 
 			for k, v := range initAgentProps {
-
-				_, err = etcddb.keysAPI.Set(
-					context.Background(),                                              // context
-					fmt.Sprintf("/todd/testruns/%s/agents/%s/%s", testUUID, agent, k), // key
-					v,   // value
-					nil, //optional args
-				)
+				propKey := path.Join(key, k)
+				err = db.set(propKey, v)
 				if err != nil {
-					log.Error("Problem setting initial agent placeholder in testrun: ", testUUID)
-					log.Error(err)
-					return err
+					return errors.Wrapf(err, "setting %q = %q", propKey, v)
 				}
 			}
 		}
-
 	}
 
 	return nil
 }
 
 // SetAgentTestStatus sets the status for an agent in a particular testrun key.
-func (etcddb *etcdDB) SetAgentTestStatus(testUUID, agentUUID, status string) error {
-	_, err := etcddb.keysAPI.Set(
-		context.Background(),                                                   // context
-		fmt.Sprintf("/todd/testruns/%s/agents/%s/status", testUUID, agentUUID), // key
-		status, // value
-		nil,    //optional args
-	)
-	if err != nil {
-		log.Errorf("Problem updating status for agent %s in test %s", agentUUID, testUUID)
-		log.Error(err)
-		return err
-	}
-
-	return nil
+func (db *etcdDB) SetAgentTestStatus(testUUID, agentUUID, status string) error {
+	key := path.Join(keyTestRuns, testUUID, "agents", agentUUID, "status")
+	return db.set(key, status)
 }
 
 // SetAgentTestData sets the post-test data for an agent in a particular testrun
-func (etcddb *etcdDB) SetAgentTestData(testUUID, agentUUID, testData string) error {
-	_, err := etcddb.keysAPI.Set(
-		context.Background(),                                                     // context
-		fmt.Sprintf("/todd/testruns/%s/agents/%s/testdata", testUUID, agentUUID), // key
-		testData, // value
-		nil,      //optional args
-	)
-	if err != nil {
-		log.Errorf("Problem updating testdata for agent %s in test %s", agentUUID, testUUID)
-		log.Error(err)
-		return err
-	}
-
-	return nil
+func (db *etcdDB) SetAgentTestData(testUUID, agentUUID string, testData map[string]map[string]interface{}) error {
+	key := path.Join(keyTestRuns, testUUID, "agents", agentUUID, "testdata")
+	_, err := db.setJSON(key, testData, nil)
+	return err
 }
 
 // GetTestStatus returns a map containing a list of agent UUIDs that are participating in the provided test, and their status in this test.
-func (etcddb *etcdDB) GetTestStatus(testUUID string) (map[string]string, error) {
-
+func (db *etcdDB) GetTestStatus(testUUID string) (map[string]string, error) {
 	retMap := make(map[string]string)
 
-	keyStr := fmt.Sprintf("/todd/testruns/%s/agents", testUUID)
+	key := path.Join(keyTestRuns, testUUID, "agents")
 
-	log.Debug("Retrieving detailed test status for ", testUUID)
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
+	node, err := db.get(key)
 	if err != nil {
 		log.Errorf("Error - empty test encountered for %q: %v", testUUID, err)
 		return retMap, nil
 	}
 
-	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
-
 	// We are expecting that this node is a directory
-	if !resp.Node.Dir {
+	if !node.Dir {
 		return nil, errors.New("Etcd query for detailed test status did not result in a directory as expected")
 	}
 
 	// Iterate over found objects
-	for _, node := range resp.Node.Nodes {
-		statusKey := fmt.Sprintf("%s/status", node.Key)
-
-		// Extract UUID from key string
-		agentUUID := strings.Replace(node.Key, fmt.Sprintf("/todd/testruns/%s/agents/", testUUID), "", 1)
-
-		statusResp, err := etcddb.keysAPI.Get(context.Background(), statusKey, nil)
-		if err != nil {
-			log.Errorf("Error - empty agent status encountered: %s", testUUID)
-			continue
+	for _, node := range node.Nodes {
+		agentUUID := path.Base(node.Key) // Extract UUID from key string
+		for _, subNode := range node.Nodes {
+			if path.Base(subNode.Key) == "status" {
+				retMap[agentUUID] = subNode.Value
+			}
 		}
-
-		retMap[agentUUID] = statusResp.Node.Value
 	}
 
 	return retMap, nil
@@ -482,132 +337,123 @@ func (etcddb *etcdDB) GetTestStatus(testUUID string) (map[string]string, error) 
 
 // GetAgentTestData returns un-sanitized data from the individual agents. For a report of all agents' data,
 // which has been sanitized by the server, see GetCleanTestData
-func (etcddb *etcdDB) GetAgentTestData(testUUID, sourceGroup string) (map[string]string, error) {
+func (db *etcdDB) GetTestData(testUUID string) (map[string]map[string]map[string]interface{}, error) {
+	retMap := make(map[string]map[string]map[string]interface{})
 
-	retMap := make(map[string]string)
-
-	keyStr := fmt.Sprintf("/todd/testruns/%s/agents", testUUID)
-
-	log.Debug("Retrieving detailed test data for ", testUUID)
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
+	node, err := db.get(path.Join(keyTestRuns, testUUID, "agents"))
 	if err != nil {
-		log.Errorf("Error - empty test encountered for %q: %v", testUUID, err)
+		if err == ErrNotExist {
+			log.Errorf("Error - empty test encountered for %q: %v", testUUID, err)
+			return retMap, nil
+		}
 		return nil, err
 	}
 
-	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
-
 	// We are expecting that this node is a directory
-	if !resp.Node.Dir {
+	if !node.Dir {
 		return nil, errors.New("Etcd query for detailed test data did not result in a directory as expected")
 	}
 
 	// Iterate over found objects
-	for _, node := range resp.Node.Nodes {
+	for _, node := range node.Nodes {
 		// Extract UUID from key string
-		agentUUID := strings.Replace(node.Key, fmt.Sprintf("/todd/testruns/%s/agents/", testUUID), "", 1)
+		agentUUID := path.Base(node.Key)
 
-		groupKey := fmt.Sprintf("%s/group", node.Key)
-		groupResp, err := etcddb.keysAPI.Get(context.Background(), groupKey, nil)
-		if err != nil {
-			log.Errorf("Error retrieving group of agent in: %s", testUUID)
-			return nil, err
-		}
+		for _, subNode := range node.Nodes {
+			if path.Base(subNode.Key) != "testdata" {
+				continue
+			}
 
-		if groupResp.Node.Value != sourceGroup {
-			continue
+			var testData map[string]map[string]interface{}
+			err := json.Unmarshal([]byte(subNode.Value), &testData)
+			if err != nil {
+				log.Errorf("Unable to unmarshal testData for %q: %s", agentUUID, subNode.Value)
+				continue
+			}
+			retMap[agentUUID] = testData
 		}
-
-		testRunDataKey := fmt.Sprintf("%s/testdata", node.Key)
-		dataResp, err := etcddb.keysAPI.Get(context.Background(), testRunDataKey, nil)
-		if err != nil {
-			log.Errorf("Error retrieving testdata of agent in: %s", testUUID)
-			return nil, err
-		}
-		retMap[agentUUID] = dataResp.Node.Value
 	}
 
 	return retMap, nil
 }
 
-// WriteCleanTestData will write the post-test metrics data that has been cleaned up and
-// ready to be displayed or exported to the database
-func (etcddb *etcdDB) WriteCleanTestData(testUUID string, testData string) error {
+func (db *etcdDB) createDir(key string) error {
+	log.Infof("Creating directory %q in etcd", key)
 
-	log.Debugf("/todd/testruns/%s/cleandata/", testUUID)
-
-	keyStr := fmt.Sprintf("/todd/testruns/%s/cleandata/", testUUID)
-
-	_, err := etcddb.keysAPI.Set(
+	_, err := db.keysAPI.Set(
 		context.Background(), // context
-		keyStr,               // key
-		testData,             // value
-		nil,                  //optional args
+		key,                  // key
+		"",                   // value
+		&client.SetOptions{Dir: true, TTL: time.Second * 3000}, //optional args
+		// TODO(mierdin): I set the TTL here so that I didn't dirty etcd with a bunch of old testruns while I develop this feature.
+		// Need to decide if doing our own garbage collection is a better approach.
 	)
+	return err
+}
+
+func (db *etcdDB) get(key string) (*client.Node, error) {
+	log.Printf("Getting %q key value", key)
+
+	resp, err := db.keysAPI.Get(context.Background(), key, &client.GetOptions{Recursive: true})
 	if err != nil {
-		log.Error("Problem setting object in etcd")
+		if isNotExist(err) {
+			return nil, ErrNotExist
+		}
+		return nil, err
+	}
+
+	log.Debugf("Etcd 'get' is done. Metadata is %q\n", resp)
+	return resp.Node, nil
+}
+
+func (db *etcdDB) remove(key string) error {
+	_, err := db.keysAPI.Delete(context.Background(), key, &client.DeleteOptions{Recursive: true, Dir: true})
+	if err != nil {
+		if isNotExist(err) {
+			return ErrNotExist
+		}
 		return err
 	}
 
-	log.Infof("Wrote clean test data to test uuid: %s", testUUID)
-
+	log.Infof("Removed %q key", key)
 	return nil
 }
 
-// GetCleanTestData will retrieve clean test data from the database
-func (etcddb *etcdDB) GetCleanTestData(testUUID string) (string, error) {
+func (db *etcdDB) set(key, value string) error {
+	log.Debugf("Setting %q = %q", key, value)
 
-	keyStr := fmt.Sprintf("/todd/testruns/%s/cleandata", testUUID)
-
-	log.Debug("Retrieving clean test data for ", testUUID)
-
-	resp, err := etcddb.keysAPI.Get(context.Background(), keyStr, &client.GetOptions{Recursive: true})
-	if err, ok := err.(client.Error); ok {
-		switch err.Code {
-		case client.ErrorCodeKeyNotFound:
-			return "", ErrNotExist
-		default:
-			log.Error(err)
-			log.Errorf("Error - empty test data: %s", testUUID)
-			return "", err
-		}
-	}
-
-	return string(resp.Node.Value), nil
+	_, err := db.keysAPI.Set(
+		context.Background(), // context
+		key,                  // key
+		value,                // value
+		nil,                  //optional args
+	)
+	return err
 }
 
-// TODO (mierdin): I have commented this out for now - may use this in the future to ensure that only one test is activated at a time.
-//
-// SetFlag will update etcd with the flag that indicates if tests can be run.
-// func (etcddb EtcdDB) SetFlag(s string) errors.Error {
+func (db *etcdDB) setJSON(key string, v interface{}, opts *client.SetOptions) (*client.Response, error) {
+	log.Infof("Setting %q key", key)
 
-//     // Enforce the two valid values for this function
-//     if s != "nogo" && s != "go" {
-//         return errors.New("Invalid value for SetFlag")
-//     }
+	j, err := json.Marshal(v)
+	if err != nil {
+		log.Error("Problem converting Agent Advertisement to JSON")
+		return nil, errors.Wrap(err, "marshaling to JSON")
+	}
 
-//     cfg := client.Config{
-//         Endpoints: []string{"http://192.168.59.103:4001"},
-//         Transport: client.DefaultTransport,
-//         // set timeout per request to fail fast when the target endpoint is unavailable
-//         HeaderTimeoutPerRequest: time.Second,
-//     }
-//     c, err := client.New(cfg)
-//     if err != nil {
-//         log.Fatal(err)
-//     }
-//     kapi := client.NewKeysAPI(c)
+	resp, err := db.keysAPI.Set(
+		context.Background(), // context
+		key,                  // key
+		string(j),            // value
+		opts,                 //optional args
+	)
 
-//     _, err = kapi.Set(
-//         context.Background(), // context
-//         "/todd/flag",         // key
-//         string(s),            // value
-//         nil,                  //optional args
-//     )
-//     common.FailOnError(err, "Problem setting flag in etcd")
+	return resp, errors.Wrap(err, "setting in etcd")
+}
 
-//     log.Infof("Set '/todd/flag' key to %s", s)
-
-//     return nil
-// }
+func isNotExist(err error) bool {
+	etcdErr, ok := err.(client.Error)
+	if !ok {
+		return false
+	}
+	return etcdErr.Code == client.ErrorCodeKeyNotFound
+}

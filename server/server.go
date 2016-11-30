@@ -19,11 +19,11 @@ import (
 type Server struct {
 	config *config.Config
 	comms  comms.Comms
-	db     db.DatabasePackage
+	db     db.Database
 	assets assetProvider
 }
 
-func New(cfg *config.Config, cms comms.Comms, d db.DatabasePackage, assets assetProvider) *Server {
+func New(cfg *config.Config, cms comms.Comms, d db.Database, assets assetProvider) *Server {
 	return &Server{
 		config: cfg,
 		comms:  cms,

@@ -52,13 +52,9 @@ func main() {
 	assets := newAssetConfig(cfg)
 
 	// Perform database initialization tasks
-	tdb, err := db.NewToddDB(cfg)
+	tdb, err := db.New(cfg)
 	if err != nil {
-		log.Fatalf("Error setting up database: %v\n", err)
-	}
-
-	if err := tdb.Init(); err != nil {
-		log.Fatalf("Error initializing database: %v\n", err)
+		log.Fatalf("Error setting up database: %v", err)
 	}
 
 	// Start listening for agent advertisements
@@ -72,7 +68,7 @@ func main() {
 	// Initialize API
 	tapi := toddapi.ServerAPI{Server: srv}
 	go func() {
-		log.Fatal(tapi.Start(cfg))
+		log.Fatal(tapi.Start(cfg, tdb))
 	}()
 
 	ctx, done := context.WithCancel(context.Background())
@@ -92,7 +88,7 @@ func main() {
 	go func() {
 		for {
 			log.Info("Beginning group calculation")
-			grouping.CalculateGroups(cfg)
+			grouping.CalculateGroups(cfg, tdb)
 			time.Sleep(time.Second * time.Duration(cfg.Grouping.Interval))
 		}
 	}()

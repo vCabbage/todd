@@ -24,13 +24,7 @@ import (
 
 // CalculateGroups is a function designed to ingest a list of group objects, a collection of agents, and
 // return a map that contains the resulting group for each agent UUID.
-func CalculateGroups(cfg *config.Config) {
-
-	tdb, err := db.NewToddDB(cfg)
-	if err != nil {
-		log.Fatalf("Error connecting to DB: %v", err)
-	}
-
+func CalculateGroups(cfg *config.Config, tdb db.Database) {
 	// Retrieve all currently active agents
 	agents, err := tdb.GetAgents()
 	if err != nil {

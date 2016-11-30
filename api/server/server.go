@@ -23,7 +23,7 @@ import (
 // ServerAPI contains necessary components for server handlers.
 type ServerAPI struct {
 	cfg    *config.Config
-	tdb    db.DatabasePackage
+	tdb    db.Database
 	Server *server.Server
 }
 
@@ -31,14 +31,8 @@ type ServerAPI struct {
 // the configured host and port.
 //
 // Start blocks until http.ListenAndServe returns.
-func (s *ServerAPI) Start(cfg *config.Config) error {
+func (s *ServerAPI) Start(cfg *config.Config, tdb db.Database) error {
 	s.cfg = cfg
-
-	tdb, err := db.NewToddDB(s.cfg)
-	if err != nil {
-		return err
-	}
-
 	s.tdb = tdb
 
 	// TODO(mierdin): This needs a lot of work. Not only is the version very static
