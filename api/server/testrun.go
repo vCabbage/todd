@@ -66,7 +66,12 @@ func (s *ServerAPI) Run(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send back the testrun UUID
-	testUUID := testrun.Start(s.cfg, finalObj.(objects.TestRunObject), testRunInfo.SourceOverrides, s.Server, s.tdb)
+	testUUID, err := testrun.Start(s.cfg, finalObj.(objects.TestRunObject), testRunInfo.SourceOverrides, s.Server, s.tdb)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
 	fmt.Fprint(w, testUUID)
 }
 

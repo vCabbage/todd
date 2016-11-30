@@ -155,7 +155,10 @@ func hashFiles(dir string) (map[string]string, error) {
 	hashes := make(map[string]string, len(finfos))
 	for _, finfo := range finfos {
 		name := finfo.Name()
-		hashes[name] = hostresources.GetFileSHA256(filepath.Join(dir, name))
+		hashes[name], err = hostresources.GetFileSHA256(filepath.Join(dir, name))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return hashes, nil

@@ -9,13 +9,24 @@
 package hostresources
 
 import (
+	"regexp"
 	"testing"
 	"unicode/utf8"
 )
 
+var validShortID = regexp.MustCompile("^[a-z0-9]{12}$")
+
+// isShortID determine if an arbitrary string *looks like* a short ID.
+func isShortID(id string) bool {
+	return validShortID.MatchString(id)
+}
+
 // TestGenerateUuid tests that GenerateUuid generates a valid UUID (by length)
 func TestGenerateUuid(t *testing.T) {
-	thisUUID := GenerateUUID()
+	thisUUID, err := GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if utf8.RuneCountInString(thisUUID) != 64 {
 		t.Fatalf("Invalid UUID generated")
 	}
@@ -31,14 +42,14 @@ func TestTruncateID(t *testing.T) {
 
 // TestIsShortIDValid will test to ensure that IsShortIDValid is able to accurately identify a valid shortened UUID
 func TestIsShortIDValid(t *testing.T) {
-	if !IsShortID("eb00b2a4f7e5") {
+	if !isShortID("eb00b2a4f7e5") {
 		t.Fatalf("IsShortIDValid is not returning a correct result")
 	}
 }
 
 // TestIsShortIDValid will test to ensure that IsShortIDValid is able to accurately identify an invalid shortened UUID
 func TestIsShortIDInvalid(t *testing.T) {
-	if IsShortID("eb00bxxxxxxxxx2a4f7e5") {
+	if isShortID("eb00bxxxxxxxxx2a4f7e5") {
 		t.Fatalf("IsShortIDValid is not returning a correct result")
 	}
 }

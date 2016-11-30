@@ -49,6 +49,16 @@ func main() {
 		log.Fatalf("Error retrieving configuration at %q: %v", *configPath, err)
 	}
 
+	// Get IP
+	ip := cfg.LocalResources.IPAddrOverride
+	if ip == "" {
+		ipAddr, err := hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface)
+		if err != nil {
+			log.Fatalf("Error find address for %s: %v", cfg.LocalResources.DefaultInterface, err)
+		}
+		ip = ipAddr.String()
+	}
+
 	// Set up cache
 	ac, err := cache.Open(cfg)
 	if err != nil {
@@ -57,7 +67,10 @@ func main() {
 	defer ac.Close()
 
 	// Generate UUID
-	uuid := hostresources.GenerateUUID()
+	uuid, err := hostresources.GenerateUUID()
+	if err != nil {
+		log.Fatal(err)
+	}
 	err = ac.SetKeyValue("uuid", uuid)
 	if err != nil {
 		log.Fatal(err)
@@ -93,11 +106,12 @@ func main() {
 	}()
 
 	// Continually advertise agent status into message queue
-	advertiseAgent(cfg, tc, uuid)
+	advertiseAgent(cfg, tc, uuid, ip)
 }
 
-func advertiseAgent(cfg *config.Config, tc comms.Comms, uuid string) {
+func advertiseAgent(cfg *config.Config, tc comms.Comms, uuid, ip string) {
 	ticker := time.NewTicker(10 * time.Second) // TODO(moswalt): make configurable
+
 	for {
 		// Gather assets here as a map, and refer to a key in that map in the below struct
 		factCollectors, testlets, err := getLocalAssets(cfg.LocalResources.OptDir)
@@ -105,11 +119,6 @@ func advertiseAgent(cfg *config.Config, tc comms.Comms, uuid string) {
 			log.Error("Error gathering assets:", err)
 			<-ticker.C
 			continue
-		}
-
-		defaultaddr := cfg.LocalResources.IPAddrOverride
-		if defaultaddr == "" {
-			defaultaddr = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
 		}
 
 		fcts, err := facts.GetFacts(cfg)
@@ -122,7 +131,7 @@ func advertiseAgent(cfg *config.Config, tc comms.Comms, uuid string) {
 		// Create an AgentAdvert instance to represent this particular agent
 		me := defs.AgentAdvert{
 			UUID:           uuid,
-			DefaultAddr:    defaultaddr,
+			DefaultAddr:    ip,
 			FactCollectors: factCollectors,
 			Testlets:       testlets,
 			Facts:          fcts,

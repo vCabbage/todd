@@ -29,10 +29,13 @@ import (
 	"github.com/toddproject/todd/server/tsdb"
 )
 
-func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server, tdb db.Database) string {
+func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server, tdb db.Database) (string, error) {
 
 	// Generate UUID for test
-	testUUID := hostresources.GenerateUUID()
+	testUUID, err := hostresources.GenerateUUID()
+	if err != nil {
+		return "", err
+	}
 
 	// Retrieve current group map
 	allGroupMap, err := tdb.GetGroupMap()
@@ -77,7 +80,7 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 
 	// Reject this topology if there aren't the right number of agents registered in this topology.
 	if (trObj.Spec.TargetType == "group" && len(testAgentMap["targets"]) <= 0) || len(testAgentMap["sources"]) <= 0 {
-		return "invalidtopology"
+		return "invalidtopology", nil
 	}
 
 	// Start listening for responses from agents
@@ -103,7 +106,7 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 	if err != nil {
 		cancel()
 		log.Fatal("Problem initializing testrun in database.")
-		return "failure"
+		return "failure", nil
 	}
 
 	// Prepare testrun instruction for our source agents
@@ -177,7 +180,7 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 	go executeTestRun(testAgentMap, testUUID, trObj, cfg, tdb, cancel, sourceOverride)
 
 	// Return the testUuid so that the client can subscribe to it.
-	return testUUID
+	return testUUID, nil
 }
 
 // executeTestRun will perform three things:

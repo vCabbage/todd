@@ -10,32 +10,30 @@ package hostresources
 
 import (
 	"net"
+
+	"github.com/pkg/errors"
 )
 
 // GetIPOfInt will iterate over all addresses for the given network interface, but will return only
 // the first one it finds. TODO(mierdin): This has obvious drawbacks, particularly with IPv6. Need to figure out a better way.
-func GetIPOfInt(ifname string) net.IP {
-	interfaces, err := net.Interfaces()
+func GetIPOfInt(ifname string) (net.IP, error) {
+	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrap(err, "getting interface")
 	}
 
-	for _, iface := range interfaces {
-		if iface.Name == ifname {
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, errors.Wrap(err, "listing IP addresses")
+	}
 
-			addrs, err := iface.Addrs()
-			if err != nil {
-				panic(err)
-			}
-			for _, addr := range addrs {
-				if ipnet, ok := addr.(*net.IPNet); ok {
-					if ipnet.IP.To4() != nil {
-						return ipnet.IP
-					}
-
-				}
-			}
+	for _, addr := range addrs {
+		ipnet, ok := addr.(*net.IPNet)
+		if !ok || ipnet.IP.To4() == nil {
+			continue
 		}
+		return ipnet.IP, nil
 	}
-	return nil
+
+	return nil, errors.New("no matching IP")
 }

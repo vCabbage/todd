@@ -47,8 +47,13 @@ func getAssets(optDir, typ string) (map[string]string, error) {
 			return nil
 		}
 		// Generate hash
-		foundAssets[f.Name()] = hostresources.GetFileSHA256(path)
-		log.Debugf("Asset found locally: %s (with hash %s)", f.Name(), hostresources.GetFileSHA256(path))
+		hash, err := hostresources.GetFileSHA256(path)
+		if err != nil {
+			return err
+		}
+
+		foundAssets[f.Name()] = hash
+		log.Debugf("Asset found locally: %s (with hash %s)", f.Name(), hash)
 		return nil
 	}
 

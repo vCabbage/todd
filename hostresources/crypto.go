@@ -11,21 +11,24 @@ package hostresources
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
-	"io/ioutil"
+	"io"
+	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
-func GetFileSHA256(filename string) string {
+func GetFileSHA256(filename string) (string, error) {
 	hasher := sha256.New()
-	s, err := ioutil.ReadFile(filename)
+	file, err := os.Open(filename)
 	if err != nil {
-		log.Errorf("Error generating hash for file %s", filename)
-		panic(fmt.Sprintf("Error generating hash for file %s", filename)) // TODO: Use log.Panicf?
+		return "", errors.Wrap(err, "opening file")
 	}
-	hasher.Write(s)
+	defer file.Close()
 
-	hash := hex.EncodeToString(hasher.Sum(nil))
-	return hash
+	_, err = io.Copy(hasher, file)
+	if err != nil {
+		return "", errors.Wrap(err, "writing to hasher")
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }

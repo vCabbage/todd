@@ -12,45 +12,33 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
-	"regexp"
 	"strconv"
 )
-
-var UUID []byte // TODO: appears to be unused, delete?
-
-var validShortID = regexp.MustCompile("^[a-z0-9]{12}$")
-
-// IsShortID determine if an arbitrary string *looks like* a short ID.
-func IsShortID(id string) bool {
-	return validShortID.MatchString(id)
-}
 
 // TruncateID returns a shorthand version of a string identifier for convenience.
 // A collision with other shorthands is very unlikely, but possible.
 // In case of a collision a lookup with TruncIndex.Get() will fail, and the caller
 // will need to use a langer prefix, or the full-length Id.
 func TruncateID(id string) string {
-	trimTo := 12
-	if len(id) < trimTo {
-		trimTo = len(id)
+	if len(id) < 12 {
+		return id
 	}
-	return id[:trimTo]
+	return id[:12]
 }
 
 // GenerateUUID returns an unique id
-func GenerateUUID() string {
+func GenerateUUID() (string, error) {
+	id := make([]byte, 32)
 	for {
-		id := make([]byte, 32)
 		if _, err := io.ReadFull(rand.Reader, id); err != nil {
-			panic(err) // This shouldn't happen
+			return "", err
 		}
 		value := hex.EncodeToString(id)
 		// if we try to parse the truncated for as an int and we don't have
 		// an error then the value is all numberic and causes issues when
 		// used as a hostname. ref #3869
-		if _, err := strconv.ParseInt(TruncateID(value), 10, 64); err == nil {
-			continue
+		if _, err := strconv.ParseInt(TruncateID(value), 10, 64); err != nil {
+			return value, nil
 		}
-		return value
 	}
 }

@@ -70,11 +70,15 @@ func (s *Server) HandleAgentAdvertisement(body []byte) error {
 			}
 
 			// hashes do not match, so we need to append the asset download URL to the remediate list
-			defaultIP := s.config.LocalResources.IPAddrOverride
-			if defaultIP == "" {
-				defaultIP = hostresources.GetIPOfInt(s.config.LocalResources.DefaultInterface).String()
+			ip := s.config.LocalResources.IPAddrOverride
+			if ip == "" {
+				ipAddr, err := hostresources.GetIPOfInt(s.config.LocalResources.DefaultInterface)
+				if err != nil {
+					return err
+				}
+				ip = ipAddr.String()
 			}
-			assetURL := fmt.Sprintf("http://%s:%s/%s/%s", defaultIP, s.config.Assets.Port, assetType, name)
+			assetURL := fmt.Sprintf("http://%s:%s/%s/%s", ip, s.config.Assets.Port, assetType, name)
 			assetList = append(assetList, assetURL)
 		}
 	}
