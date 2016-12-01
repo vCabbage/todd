@@ -199,7 +199,10 @@ func (db *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
 		}
 
 		// Generate a more specific Todd Object based on the JSON data
-		finalobj := baseobj.ParseToddObject([]byte(node.Value))
+		finalobj, err := baseobj.ParseToddObject([]byte(node.Value))
+		if err != nil {
+			return nil, err
+		}
 
 		retObj = append(retObj, finalobj)
 	}
@@ -342,10 +345,6 @@ func (db *etcdDB) GetTestData(testUUID string) (map[string]map[string]map[string
 
 	node, err := db.get(path.Join(keyTestRuns, testUUID, "agents"))
 	if err != nil {
-		if err == ErrNotExist {
-			log.Errorf("Error - empty test encountered for %q: %v", testUUID, err)
-			return retMap, nil
-		}
 		return nil, err
 	}
 

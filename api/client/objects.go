@@ -46,7 +46,10 @@ func (c *ClientAPI) Objects(objType string) error {
 		return err
 	}
 
-	parsedObjects := objects.ParseToddObjects(body)
+	parsedObjects, err := objects.ParseToddObjects(body)
+	if err != nil {
+		return err
+	}
 
 	// Format in tab-separated columns with a tab stop of 8.
 	w := tabwriter.NewWriter(os.Stdout, 0, 8, 0, '\t', 0)

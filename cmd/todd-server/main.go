@@ -86,9 +86,13 @@ func main() {
 
 	// Kick off group calculation in background
 	go func() {
+		// TODO: CalculateGroups on agent/group changes instead of periodically
 		for {
 			log.Info("Beginning group calculation")
-			grouping.CalculateGroups(cfg, tdb)
+			err := grouping.CalculateGroups(cfg, tdb, tc)
+			if err != nil {
+				log.Error("Error calculating groups:", err)
+			}
 			time.Sleep(time.Second * time.Duration(cfg.Grouping.Interval))
 		}
 	}()

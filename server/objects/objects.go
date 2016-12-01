@@ -10,9 +10,8 @@ package objects
 
 import (
 	"encoding/json"
-	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 // BaseObject is the "base" struct for all objects in ToDD. All metadata shared by all todd objects should be stored here.
@@ -41,7 +40,6 @@ type ToddObject interface {
 	GetType() string
 	GetLabel() string
 	GetSpec() string
-	ParseToddObject([]byte) ToddObject
 }
 
 // GetType is a simple function to return the "Type" attribute of a BaseObject struct (or any struct that embeds it).
@@ -60,34 +58,30 @@ func (b BaseObject) GetLabel() string {
 // a specific ToDD object in the codebase, you should first Unmarshal into the BaseObject struct. Once you have a handle on that, run this struct method, and
 // pass in the original JSON (the "obj_json" param). This will identify the specific type and return that struct to you.
 // TODO(mierdin): Need a better name for this. Change it, then make sure you're replacing all instances of the old name in this file (in several comments)
-func (b BaseObject) ParseToddObject(objJSON []byte) ToddObject {
-
+func (b *BaseObject) ParseToddObject(objJSON []byte) (ToddObject, error) {
 	// The following chunk of code is designed to re-parse the JSON structure of a ToDD object, now that we know what type it is
 	// (this "Type" field is present in the base BaseObject struct).
-	var finalObj ToddObject
+	var tObj ToddObject
 	switch b.Type {
 	case "group":
-		var groupObj GroupObject
-		err := json.Unmarshal(objJSON, &groupObj)
+		var obj GroupObject
+		err := json.Unmarshal(objJSON, &obj)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-
-		finalObj = groupObj
+		tObj = obj
 	case "testrun":
-		var testrunObj TestRunObject
-		err := json.Unmarshal(objJSON, &testrunObj)
+		var obj TestRunObject
+		err := json.Unmarshal(objJSON, &obj)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-
-		finalObj = testrunObj
+		tObj = obj
 	default:
-		log.Warn("Incorrect object type passed to API")
-		os.Exit(1)
+		return nil, errors.Errorf("unknown object type: %s", b.Type)
 	}
 
-	return finalObj
+	return tObj, nil
 }
 
 // ParseToddObjects is similar to the struct ParseToddObject method but is intended to be used when you know the JSON houses a slice/list of Todd Objects.
@@ -95,52 +89,45 @@ func (b BaseObject) ParseToddObject(objJSON []byte) ToddObject {
 // TODO(mierdin): This function is still fairly inflexible, as it assumes that all objects in the JSON are of the same type. Currently, this is a safe bet because
 // the objects API doesn't currently support returning all objects, so they will all be the same type. However, if that changes in the future, this function
 // will have to be refactored.
-func ParseToddObjects(objJSON []byte) []ToddObject {
-
-	var retSlice []ToddObject
-
+func ParseToddObjects(objJSON []byte) ([]ToddObject, error) {
 	// Marshal API data into object
 	var records []BaseObject
 	err := json.Unmarshal(objJSON, &records)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	var objType string
+	retSlice := make([]ToddObject, len(records))
 
 	// Return an empty slice since there were no objects in the original JSON
 	if len(records) < 1 {
-		return retSlice
+		return retSlice, nil
 	}
 
-	objType = records[0].GetType()
-
-	switch objType {
+	switch objType := records[0].GetType(); objType {
 	case "group":
-		var groupObjs []GroupObject
-		err := json.Unmarshal(objJSON, &groupObjs)
+		var objs []GroupObject
+		err := json.Unmarshal(objJSON, &objs)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
-		for x := range groupObjs {
-			retSlice = append(retSlice, groupObjs[x])
+		for i, obj := range objs {
+			retSlice[i] = obj
 		}
-
 	case "testrun":
-		var testrunObjs []TestRunObject
-		err := json.Unmarshal(objJSON, &testrunObjs)
+		var objs []TestRunObject
+		err := json.Unmarshal(objJSON, &objs)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
-		for x := range testrunObjs {
-			retSlice = append(retSlice, testrunObjs[x])
+		for i, obj := range objs {
+			retSlice[i] = obj
 		}
 	default:
-		log.Warn("Incorrect object type passed to API")
-		os.Exit(1)
+		return nil, errors.Errorf("unknown object type: %s", objType)
 	}
 
-	return retSlice
+	return retSlice, nil
 }

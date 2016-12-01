@@ -54,7 +54,11 @@ func (s *ServerAPI) CreateObject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate a more specific Todd Object based on the JSON data
-	finalObj := baseObj.ParseToddObject(body)
+	finalObj, err := baseObj.ParseToddObject(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 
 	err = s.tdb.SetObject(finalObj)
 	if err != nil {

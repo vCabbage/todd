@@ -88,7 +88,7 @@ func (s *ServerAPI) TestData(w http.ResponseWriter, r *http.Request) {
 
 	testData, err := s.tdb.GetTestData(testUUID)
 	if err != nil {
-		if err == db.ErrNotExist {
+		if err == db.ErrNotExist || len(testData) == 0 {
 			http.Error(w, "Error, test UUID not found.", 404)
 			return
 		}

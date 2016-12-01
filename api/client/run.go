@@ -12,7 +12,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,6 +20,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/toddproject/todd/api"
 	"github.com/toddproject/todd/server/objects"
 )
@@ -174,19 +174,12 @@ func listenForTestStatus(host string) error {
 
 	var recordCount int
 	firstMessage := false
-	for {
-		// listen for reply
-		message, err := bufio.NewReader(conn).ReadString('\n')
-		// If an error is raised, it's probably because the server killed the connection
-		if err != nil {
-			// TODO(mierdin): This doesn't really tell us if the connection died because of an error or not
-			return errors.New("Disconnected from testrun status stream")
-		}
-
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
 		var statuses map[string]string
-		err = json.Unmarshal([]byte(message), &statuses)
+		err = json.Unmarshal(scanner.Bytes(), &statuses)
 		if err != nil {
-			return fmt.Errorf("Invalid status from server %q: %v", message, err)
+			return errors.Errorf("Invalid status from server %q: %v", scanner.Text(), err)
 		}
 
 		if !firstMessage {
@@ -228,6 +221,13 @@ func listenForTestStatus(host string) error {
 
 		// Send an ack back to the server to let it know we're alive
 		fmt.Fprintf(conn, "ack\n")
+	}
+
+	// If an error is raised, it's probably because the server killed the connection
+	err = scanner.Err()
+	if err != nil {
+		// TODO(mierdin): This doesn't really tell us if the connection died because of an error or not
+		return errors.Errorf("Disconnected from testrun status stream: %v", err)
 	}
 
 	return nil
