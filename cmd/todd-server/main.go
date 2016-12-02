@@ -24,6 +24,8 @@ import (
 	"github.com/toddproject/todd/db"
 	"github.com/toddproject/todd/server"
 	"github.com/toddproject/todd/server/grouping"
+	"github.com/toddproject/todd/server/testrun"
+	"github.com/toddproject/todd/server/tsdb"
 )
 
 func main() {
@@ -57,6 +59,9 @@ func main() {
 		log.Fatalf("Error setting up database: %v", err)
 	}
 
+	// Open TSDB
+	tsd := tsdb.NewToddTSDB(cfg)
+
 	// Start listening for agent advertisements
 	tc, err := comms.New(cfg)
 	if err != nil {
@@ -64,9 +69,10 @@ func main() {
 	}
 
 	srv := server.New(cfg, tc, tdb, assets)
+	runner := testrun.New(cfg, srv, tdb, tc, tsd)
 
 	// Initialize API
-	tapi := toddapi.ServerAPI{Server: srv}
+	tapi := toddapi.ServerAPI{Server: srv, Runner: runner}
 	go func() {
 		log.Fatal(tapi.Start(cfg, tdb))
 	}()

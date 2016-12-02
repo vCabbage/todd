@@ -9,14 +9,11 @@
 package testrun
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"net"
-	"os"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 
 	"github.com/toddproject/todd/agent/defs"
 	"github.com/toddproject/todd/agent/tasks"
@@ -29,71 +26,75 @@ import (
 	"github.com/toddproject/todd/server/tsdb"
 )
 
-func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides, srv *server.Server, tdb db.Database) (string, error) {
+// TestRunner provides logic for running tests.
+type TestRunner struct {
+	cfg   *config.Config
+	srv   *server.Server
+	db    db.Database
+	comms comms.Comms
+	tsdb  tsdb.Package
+}
 
+// New returns a new TestRunner.
+func New(cfg *config.Config, srv *server.Server, d db.Database, comm comms.Comms, ts tsdb.Package) *TestRunner {
+	return &TestRunner{
+		cfg:   cfg,
+		srv:   srv,
+		db:    d,
+		comms: comm,
+		tsdb:  ts,
+	}
+}
+
+// Start executes a test.
+func (t *TestRunner) Start(trObj objects.TestRunObject, sourceOverrides objects.SourceOverrides) (string, error) {
 	// Generate UUID for test
 	testUUID, err := hostresources.GenerateUUID()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "generating UUID")
 	}
 
 	// Retrieve current group map
-	allGroupMap, err := tdb.GetGroupMap()
+	allGroupMap, err := t.db.GetGroupMap()
 	if err != nil {
-		log.Fatalf("Error retrieving group map: %v", err)
+		return "", errors.Wrap(err, "retrieving group map")
 	}
 
-	// sourceOverride is a flag to pass into the executeTest function so that it knows how to return test data if the source group has been overridden
-	sourceOverride := false
-
-	// Override source params as necessary
-	if sourceOverrides.App != "" {
-		trObj.Spec.Source["app"] = sourceOverrides.App
-		sourceOverride = true
-	}
-	if sourceOverrides.Args != "" {
-		trObj.Spec.Source["args"] = sourceOverrides.Args
-		sourceOverride = true
-	}
-	if sourceOverrides.Group != "" {
-		trObj.Spec.Source["name"] = sourceOverrides.Group
-		sourceOverride = true
-	}
+	sourceOverrides.Apply(trObj.Spec.Source)
 
 	//testAgentMap is a custom map that only contains agents in the one or two groups relevant to this test
 	//The outer map should contain two keys, "targets", and "sources". The values for each key should be another
 	// map that uses the agent UUID for keys, and the group for those UUIDs as values.
-	testAgentMap := make(map[string]map[string]string)
-	testAgentMap["sources"] = make(map[string]string)
-	testAgentMap["targets"] = make(map[string]string)
+	testAgentMap := map[string]map[string]string{
+		"sources": make(map[string]string),
+		"targets": make(map[string]string),
+	}
 
 	// Here, we iterate over ALL of the agents, and pick out the ones that are part of this test, as well as what group they're in.
 	for agent, group := range allGroupMap {
-
 		// If our target type is group, and the group this agent is in matches the target group provided in the testrun object, add it to our map
-		if trObj.Spec.TargetType == "group" && group == trObj.Spec.Target.Map["name"] {
-			testAgentMap["targets"][agent] = group
-		} else if group == trObj.Spec.Source["name"] {
+		if (trObj.Spec.TargetType == "group" && group == trObj.Spec.Target.Map["name"]) ||
+			group == trObj.Spec.Source["name"] {
 			testAgentMap["sources"][agent] = group
 		}
 	}
 
 	// Reject this topology if there aren't the right number of agents registered in this topology.
-	if (trObj.Spec.TargetType == "group" && len(testAgentMap["targets"]) <= 0) || len(testAgentMap["sources"]) <= 0 {
-		return "invalidtopology", nil
+	if (trObj.Spec.TargetType == "group" && len(testAgentMap["targets"]) == 0) ||
+		len(testAgentMap["sources"]) == 0 {
+		return "", errors.New("invalid topology")
 	}
 
 	// Start listening for responses from agents
-	tc, err := comms.New(cfg)
-	if err != nil {
-		os.Exit(1) //TODO(mierdin): remove
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-	msgs, _ := tc.ListenForResponses(ctx)
+	msgs, err := t.comms.ListenForResponses(ctx)
+	if err != nil {
+		cancel()
+		return "", err
+	}
 	go func() {
 		for msg := range msgs {
-			err := srv.HandleAgentResponse(msg)
+			err := t.srv.HandleAgentResponse(msg)
 			if err != nil {
 				log.Error("Error handling agent response:", err)
 			}
@@ -102,36 +103,32 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 
 	// Initialize test in database. This will create an entry for this test under the UUID we just created, and will also write the
 	// list of agents participating in this test, with some kind of default status, for other goroutines to update with a further status.
-	err = tdb.InitTestRun(testUUID, testAgentMap)
+	err = t.db.InitTestRun(testUUID, testAgentMap)
 	if err != nil {
 		cancel()
-		log.Fatal("Problem initializing testrun in database.")
-		return "failure", nil
+		return "", errors.Wrap(err, "initializing testrun in DB")
 	}
 
 	// Prepare testrun instruction for our source agents
-	var sourceTr = defs.TestRun{
+	sourceTr := defs.TestRun{
 		UUID:    testUUID,
 		Testlet: trObj.Spec.Source["app"],
 		Args:    trObj.Spec.Source["args"],
+		Targets: trObj.Spec.Target.Slice, // Default to uncontrolled target, target IPs in testrun object
 	}
-	// Here, the list of target IP addresses is formed based on the target type
+
+	// If target type is actually group, get IPs from DB.
 	if trObj.Spec.TargetType == "group" {
-
-		// This is a group target type, so we are deriving target IPs from the DefaultAddr property of this agent.
-		var targetIPs []string
-		for uuid := range testAgentMap["targets"] {
-			agent, err := tdb.GetAgent(uuid)
-			if err != nil {
-				log.Fatalf("Error retrieving agent: %v", err)
-			}
-			targetIPs = append(targetIPs, agent.DefaultAddr)
+		agents, err := t.db.GetAgents()
+		if err != nil {
+			cancel()
+			return "", errors.Wrap(err, "retrieving agents")
 		}
-		sourceTr.Targets = targetIPs
-
-	} else {
-		// This is an uncontrolled target, so we are deriving target IPs directly from what's listed in the testrun object
-		sourceTr.Targets = trObj.Spec.Target.Slice
+		for _, agent := range agents {
+			if _, ok := testAgentMap["targets"][agent.UUID]; ok {
+				sourceTr.Targets = append(sourceTr.Targets, agent.DefaultAddr)
+			}
+		}
 	}
 
 	// Prepare a task for carrying the testrun instruction to the agent
@@ -145,13 +142,16 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 	// the testrun will require a response from each agent before actually moving on with execution, but I'd like something better.
 	// Something that feels more like a true distributed system. Perfect is the enemy of good, however, and this works well for a prototype.
 	for uuid := range testAgentMap["sources"] {
-		tc.SendTask(uuid, itrTask)
+		err = t.comms.SendTask(uuid, itrTask)
+		if err != nil {
+			cancel()
+			return "", errors.Wrapf(err, "sending task to %q", uuid)
+		}
 	}
 
-	// If this testrun is targeted at another todd group, we want to send testrun tasks to those as well
 	if trObj.Spec.TargetType == "group" {
-
-		var targetTr = defs.TestRun{
+		// If this testrun is targeted at another todd group, we want to send testrun tasks to those as well
+		targetTr := defs.TestRun{
 			UUID:    testUUID,
 			Targets: []string{"0.0.0.0"}, // Targets are typically running some kind of ongoing service, so we send a single target of 0.0.0.0 to indicate this.
 			Testlet: trObj.Spec.Target.Map["app"],
@@ -163,21 +163,17 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 			TR:       targetTr,
 		}
 
-		tc, err := comms.New(cfg)
-		if err != nil {
-			os.Exit(1) //TODO(mierdin): remove
-		}
-
 		// Send testrun to each agent UUID in the targets group
 		for uuid := range testAgentMap["targets"] {
-			tc.SendTask(uuid, itrTask)
+			t.comms.SendTask(uuid, itrTask)
+			if err != nil {
+				cancel()
+				return "", errors.Wrapf(err, "sending task to %q", uuid)
+			}
 		}
 	}
 
-	// Start monitoring service
-	go testMonitor(cfg, tdb, testUUID, ctx)
-
-	go executeTestRun(testAgentMap, testUUID, trObj, cfg, tdb, cancel, sourceOverride)
+	go t.executeTestRun(ctx, testAgentMap, testUUID, trObj, cancel, !sourceOverrides.AnySet())
 
 	// Return the testUuid so that the client can subscribe to it.
 	return testUUID, nil
@@ -189,90 +185,24 @@ func Start(cfg *config.Config, trObj objects.TestRunObject, sourceOverrides obje
 // - When the status for all agents is "ready", it will send execution tasks to one or both groups
 // - It will continue to monitor, and when all agents have finished, it will pull the "leash" to stop the TCP stream to the client
 // - After pulling the leash, it will call the function that will aggregate the test data and upload to a third party service
-func executeTestRun(testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cfg *config.Config, tdb db.Database, done func(), sourceOverride bool) {
-
-	// Sleep for 2 seconds so that the client moniting can connect first
-	time.Sleep(2000 * time.Millisecond)
-
+func (t *TestRunner) executeTestRun(ctx context.Context, testAgentMap map[string]map[string]string, testUUID string, trObj objects.TestRunObject, cancel func(), updateTSDB bool) {
 	// First, let's just keep retrieving statuses until all of the agents are reporting ready
-readyloop:
-	for {
-		time.Sleep(1000 * time.Millisecond)
-
-		testStatuses, err := tdb.GetTestStatus(testUUID)
-		if err != nil {
-			log.Fatalf("Error retrieving test status: %v", err)
-		}
-		for _, status := range testStatuses {
-			switch true {
-			case status == "fail":
-				log.Error("Agent reported failure during testing")
-				os.Exit(1)
-			case status != "ready":
-				continue readyloop
-			}
-		}
-		break
-	}
-
-	tc, err := comms.New(cfg)
+	err := t.agentsInStatus(ctx, testUUID, "ready")
 	if err != nil {
-		os.Exit(1) //TODO(mierdin): remove
+		cancel()
+		log.Error(err)
+		return
 	}
 
 	// If this is a group target type, we want to make sure that the targets are set up and reporting a status of "testing"
 	// before we spin up the source tests
 	if trObj.Spec.TargetType == "group" {
-		targetTask := &tasks.ExecuteTestRun{
-			BaseTask:  tasks.BaseTask{Type: "ExecuteTestRun"},
-			TestUUID:  testUUID,
-			TimeLimit: cfg.Testing.Timeout,
-		}
-
-		// Send testrun to each agent UUID in the targets group
-		for uuid := range testAgentMap["targets"] {
-			tc.SendTask(uuid, targetTask)
-		}
-
 		// Next, we want to wait to make sure that the targets are all "testing" before instructing the source group to execute
-	targetsreadyloop:
-		for {
-
-			time.Sleep(1000 * time.Millisecond)
-
-			testStatuses, err := tdb.GetTestStatus(testUUID)
-			if err != nil {
-				log.Fatalf("Error retrieving test status: %v", err)
-			}
-
-			// We're creating this map to hold ONLY the targets that are in testStatuses (which also contains sources)
-			targetStatuses := make(map[string]string)
-
-			// Iterate all of the sources and agents
-			for agent, status := range testStatuses {
-
-				// if this agent is present in the group map....
-				targetmap := testAgentMap["targets"]
-				if val, ok := targetmap[agent]; ok {
-
-					//...and it's also in our target group, add it to our targets map
-					if val == trObj.Spec.Target.Map["name"] {
-						targetStatuses[agent] = status
-					}
-				}
-			}
-
-			for agent, status := range targetStatuses {
-				switch {
-				case status == "fail":
-					log.Errorf("Agent %s reported failure during testing", agent)
-					os.Exit(1)
-				case status != "testing":
-					log.Errorf("%s is not ready, so the sources must wait!!", agent)
-					continue targetsreadyloop
-				}
-			}
-			break
+		err = t.targetsReady(ctx, testUUID, testAgentMap, trObj)
+		if err != nil {
+			cancel()
+			log.Error(err)
+			return
 		}
 	}
 
@@ -285,119 +215,122 @@ readyloop:
 
 	// Send testrun to each agent UUID in the targets group
 	for uuid := range testAgentMap["sources"] {
-		tc.SendTask(uuid, sourceTask)
+		err = t.comms.SendTask(uuid, sourceTask)
+		if err != nil {
+			cancel()
+			log.Errorf("Error sending execute task to %q: %v", uuid, err)
+			return
+		}
+	}
+
+	if trObj.Spec.TargetType == "group" {
+		targetTask := &tasks.ExecuteTestRun{
+			BaseTask:  tasks.BaseTask{Type: "ExecuteTestRun"},
+			TestUUID:  testUUID,
+			TimeLimit: t.cfg.Testing.Timeout,
+		}
+
+		// Send testrun to each agent UUID in the targets group
+		for uuid := range testAgentMap["targets"] {
+			t.comms.SendTask(uuid, targetTask)
+			if err != nil {
+				cancel()
+				log.Errorf("Error sending execute task to target %q: %v", uuid, err)
+				return
+			}
+		}
 	}
 
 	// Let's wait once more until all agents are stored in the database with a status of "finished"
-finishedloop:
-	for {
-		time.Sleep(1000 * time.Millisecond)
-
-		testStatuses, err := tdb.GetTestStatus(testUUID)
-		if err != nil {
-			log.Fatalf("Error retrieving test status: %v", err)
-		}
-		for agent, status := range testStatuses {
-			switch true {
-			case status == "fail":
-				log.Errorf("Agent %s reported failure during testing", agent)
-				os.Exit(1)
-			case status != "finished":
-				continue finishedloop
-			}
-		}
-		break
-	}
-
-	if sourceOverride {
-		done()
-	}
-
-	testData, err := tdb.GetTestData(testUUID)
+	err = t.agentsInStatus(ctx, testUUID, "finished")
 	if err != nil {
-		log.Fatalf("Error retrieving agent test data: %v", err)
-	}
-
-	timeDB := tsdb.NewToddTSDB(cfg)
-	err = timeDB.WriteData(testUUID, trObj.Label, trObj.Spec.Source["name"], testData)
-	if err != nil {
-		log.Debug(err)
-		log.Error("Problem writing metrics to TSDB")
-	}
-
-	// Clean up our goroutines
-	done()
-}
-
-// testMonitor offers a basic TCP stream for the ToDD client to subscribe to in order to receive updates during the course of a test.
-func testMonitor(cfg *config.Config, tdb db.Database, testUUID string, ctx context.Context) {
-
-	// I implemented this retry functionality as a temporary fix for an issue that came up only once in a while, where
-	// the net.Listen would throw an error indicating the port was already in use. Not sure why this happens yet, as I
-	// am not running multiple instance of testMonitor at a time. TODO(mierdin): need to revisit this and perhaps
-	// replace this retry with a Mutex.
-	retries := 0
-
-retrytcpserver:
-
-	if retries > 5 {
-		log.Error("TCP Server for testrun status failed to initialize.")
+		cancel()
+		log.Error(err)
 		return
 	}
 
-	// listen on all interfaces
-	ln, err := net.Listen("tcp", ":8081")
-	if err != nil {
-		retries = retries + 1
-		time.Sleep(1000 * time.Millisecond)
-		goto retrytcpserver
+	if !updateTSDB {
+		return
 	}
-	defer ln.Close()
 
-	// accept connection on port
-	conn, err := ln.Accept()
+	testData, err := t.db.GetTestData(testUUID)
 	if err != nil {
-		retries = retries + 1
-		time.Sleep(1000 * time.Millisecond)
-		goto retrytcpserver
+		log.Error("Error retrieving agent test data:", err)
+		return
 	}
-	defer conn.Close()
 
-	// Constantly poll for test status, and send statuses to client
+	err = t.tsdb.WriteData(testUUID, trObj.Label, trObj.Spec.Source["name"], testData)
+	if err != nil {
+		log.Error("Problem writing metrics to TSDB:", err)
+	}
+}
+
+func (t *TestRunner) agentsInStatus(ctx context.Context, testUUID, status string) error {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(1000 * time.Millisecond)
-
-		testStatuses, err := tdb.GetTestStatus(testUUID)
-		if err != nil {
-			log.Fatalf("Error retrieving test status: %v", err)
-		}
-
-		statusesJSON, err := json.Marshal(testStatuses)
-		if err != nil {
-			log.Fatal("Failed to marshal agent test status message")
-			os.Exit(1)
-		}
-
-		// Send status to client
-		newMessage := string(statusesJSON)
-		conn.Write([]byte(newMessage + "\n")) // TODO: Append '\n` to statusesJSON instead of converting to string`
-
-		// Detect a client disconnect
-		_, err = bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			return
-		}
-
-		// TODO(mierdin): Need to add failure notification (status of "fail" for any one agent)
-
-		// Check to see if the calling function has asked that we shut down
-		// Because of the presence of the default statement, this select statement will not block. It will allow the
-		// loop to repeat if the channel does not contain data, and if it does this function will return.
 		select {
 		case <-ctx.Done():
-			log.Debug("Killed testrun monitoring goroutine")
-			return
-		default:
+			return errors.New("Test Run Cancelled")
+		case <-ticker.C:
+			// TODO: Update when new status from client
+			testStatuses, err := t.db.GetTestStatus(testUUID)
+			if err != nil {
+				if err == db.ErrNotExist {
+					continue
+				}
+				log.Error("Error retrieving test status:", err)
+			}
+
+			for _, status := range testStatuses {
+				switch status {
+				case "fail":
+					return errors.New("Agent reported failure during testing")
+				case status:
+					continue
+				}
+			}
+			return nil
+		}
+	}
+}
+
+func (t *TestRunner) targetsReady(ctx context.Context, testUUID string, testAgentMap map[string]map[string]string, trObj objects.TestRunObject) error {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("Test Run Cancelled")
+		case <-ticker.C:
+			testStatuses, err := t.db.GetTestStatus(testUUID)
+			if err != nil {
+				if err == db.ErrNotExist {
+					continue
+				}
+				log.Fatalf("Error retrieving test status: %v", err)
+			}
+
+			// We're creating this map to hold ONLY the targets that are in testStatuses (which also contains sources)
+			targetStatuses := make(map[string]string)
+
+			// Iterate all of the sources and agents
+			for agent, status := range testStatuses {
+				// if this agent is present in the group map
+				if val, ok := testAgentMap["targets"][agent]; ok && val == trObj.Spec.Target.Map["name"] {
+					targetStatuses[agent] = status
+				}
+			}
+
+			for _, status := range testStatuses {
+				switch status {
+				case "fail":
+					return errors.New("Agent reported failure during testing")
+				case "testing":
+					continue
+				}
+			}
+			return nil
 		}
 	}
 }

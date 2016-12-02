@@ -18,6 +18,7 @@ import (
 	"github.com/toddproject/todd/server"
 
 	"github.com/toddproject/todd/config"
+	"github.com/toddproject/todd/server/testrun"
 )
 
 // ServerAPI contains necessary components for server handlers.
@@ -25,6 +26,7 @@ type ServerAPI struct {
 	cfg    *config.Config
 	tdb    db.Database
 	Server *server.Server
+	Runner *testrun.TestRunner
 }
 
 // Start configured ServerAPI, registers handlers, and starts listening only
@@ -47,6 +49,7 @@ func (s *ServerAPI) Start(cfg *config.Config, tdb db.Database) error {
 	http.HandleFunc("/v1/object/delete", s.DeleteObject)
 	http.HandleFunc("/v1/testrun/run", s.Run)
 	http.HandleFunc("/v1/testdata", s.TestData)
+	http.HandleFunc("/v1/testrun/status/", s.TestStatus)
 
 	serveURL := fmt.Sprintf("%s:%s", s.cfg.API.Host, s.cfg.API.Port)
 
@@ -66,6 +69,6 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 
 // writeError logs the error and sends a 500 to the client.
 func writeError(w http.ResponseWriter, err error) {
-	log.Errorln(err)
-	http.Error(w, "Internal Error", 500)
+	log.Error(err)
+	http.Error(w, err.Error(), 500)
 }

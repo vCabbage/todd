@@ -65,3 +65,21 @@ type SourceOverrides struct {
 	App   string `json:"source_app"`
 	Args  string `json:"source_args"`
 }
+
+// AnySet returns whether and of the fields are set.
+func (s *SourceOverrides) AnySet() bool {
+	return s.Group != "" || s.App != "" || s.Args != ""
+}
+
+// Apply overrides source params as necessary
+func (s *SourceOverrides) Apply(source map[string]string) {
+	if s.App != "" {
+		source["app"] = s.App
+	}
+	if s.Args != "" {
+		source["args"] = s.Args
+	}
+	if s.Group != "" {
+		source["name"] = s.Group
+	}
+}

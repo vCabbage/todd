@@ -9,13 +9,11 @@
 package api
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"time"
@@ -72,31 +70,22 @@ func (c *ClientAPI) Run(sourceOverrides objects.SourceOverrides, testrunName str
 	defer io.Copy(ioutil.Discard, resp.Body)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		return errors.New(resp.Status)
-	}
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	testUUID := string(body)
-
-	switch testUUID {
-	case "notfound":
-		return errors.New("ERROR - Specified testrun object not found")
-	case "invalidtopology":
-		return errors.New("ERROR - Not enough agents are in the groups specified by the testrun")
-	case "failure":
-		return errors.New("ERROR - some kind of error was encountered on the server. Test was not run")
+	if resp.StatusCode != 200 {
+		return errors.Errorf("%s: %s", resp.Status, body)
 	}
+
+	testUUID := string(body)
 
 	fmt.Print("\nRUNNING TEST: ", testUUID)
 	fmt.Print("\n\n")
 	fmt.Println("(Please be patient while the test finishes...)")
 
-	err = listenForTestStatus(c.host)
+	err = c.listenForTestStatus(testUUID)
 	if err != nil {
 		fmt.Printf("Problem subscribing to testrun updates stream: %s\n", err)
 		fmt.Println("Will now watch the testrun metrics API for 45 seconds to see if we get a result that way. Please wait...")
@@ -154,42 +143,33 @@ func getRunResult(baseURL string, testUUID string) ([]byte, error) {
 // listenForTestStatus connects to the server's test event stream and prints the progression
 //
 // This blocks until all agents have finished or an error occurs.
-func listenForTestStatus(host string) error {
-	retries := 0
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:8081", host))
-
-	// If the call to net.Dial produces an error, this loop will execute the call again
-	// until "retries" reaches it's configured limit
-	for err != nil {
-		if retries > 5 {
-			return errors.New("Failed to subscribe to test event stream after several retries.")
-		}
-
-		retries++
-		time.Sleep(1 * time.Second)
-		fmt.Println("Failed to subscribe to test event stream. Retrying...")
-		conn, err = net.Dial("tcp", fmt.Sprintf("%s:8081", host))
+func (c *ClientAPI) listenForTestStatus(uuid string) error {
+	resp, err := c.http.Get(c.baseURL + "/testrun/status/" + uuid)
+	if err != nil {
+		return err
 	}
-	defer conn.Close()
+	defer io.Copy(ioutil.Discard, resp.Body)
+	defer resp.Body.Close()
 
-	var recordCount int
-	firstMessage := false
-	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
+	if resp.StatusCode != 200 {
+		return errors.New(resp.Status)
+	}
+
+	dec := json.NewDecoder(resp.Body)
+
+	for recordCount := -1; dec.More(); {
 		var statuses map[string]string
-		err = json.Unmarshal(scanner.Bytes(), &statuses)
+		err := dec.Decode(&statuses)
 		if err != nil {
-			return errors.Errorf("Invalid status from server %q: %v", scanner.Text(), err)
+			return err
 		}
 
-		if !firstMessage {
+		if recordCount < 1 {
 			recordCount = len(statuses)
-			firstMessage = true
 		}
 
 		init, ready, testing, finished := 0, 0, 0, 0
 		for _, status := range statuses {
-
 			switch status {
 			case "init":
 				init++
@@ -218,16 +198,6 @@ func listenForTestStatus(host string) error {
 		if finished == recordCount {
 			break
 		}
-
-		// Send an ack back to the server to let it know we're alive
-		fmt.Fprintf(conn, "ack\n")
-	}
-
-	// If an error is raised, it's probably because the server killed the connection
-	err = scanner.Err()
-	if err != nil {
-		// TODO(mierdin): This doesn't really tell us if the connection died because of an error or not
-		return errors.Errorf("Disconnected from testrun status stream: %v", err)
 	}
 
 	return nil

@@ -13,13 +13,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/toddproject/todd/api"
 	"github.com/toddproject/todd/db"
 	"github.com/toddproject/todd/server/objects"
-	"github.com/toddproject/todd/server/testrun"
 )
 
 // Run will activate an existing testrun
@@ -66,7 +67,7 @@ func (s *ServerAPI) Run(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send back the testrun UUID
-	testUUID, err := testrun.Start(s.cfg, finalObj.(objects.TestRunObject), testRunInfo.SourceOverrides, s.Server, s.tdb)
+	testUUID, err := s.Runner.Start(finalObj.(objects.TestRunObject), testRunInfo.SourceOverrides)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -97,4 +98,52 @@ func (s *ServerAPI) TestData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, testData)
+}
+
+// TestStatus streams the agent statuses for the requested test UUID.
+func (s *ServerAPI) TestStatus(w http.ResponseWriter, r *http.Request) {
+	testUUID := strings.TrimPrefix(r.URL.Path, "/v1/testrun/status/")
+
+	if testUUID == "" {
+		http.Error(w, "must provide UUID", http.StatusBadRequest)
+	}
+
+	cn, ok := w.(http.CloseNotifier)
+	if !ok {
+		http.Error(w, "unsupported client", http.StatusBadRequest)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "unsupported client", http.StatusBadRequest)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+
+	// Constantly poll for test status, and send statuses to client
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-cn.CloseNotify():
+			return
+		case <-ticker.C:
+			testStatuses, err := s.tdb.GetTestStatus(testUUID)
+			if err != nil {
+				log.Error("Error retrieving test status:", err)
+				return
+			}
+
+			err = enc.Encode(testStatuses)
+			if err != nil {
+				log.Error("Failed to marshal agent test status message:", err)
+				return
+			}
+			flusher.Flush()
+
+			// TODO(mierdin): Need to add failure notification (status of "fail" for any one agent)
+		}
+	}
 }
