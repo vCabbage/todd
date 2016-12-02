@@ -60,7 +60,11 @@ func main() {
 	}
 
 	// Open TSDB
-	tsd := tsdb.NewToddTSDB(cfg)
+	tsd, err := tsdb.New(cfg)
+	if err != nil {
+		log.Fatal("Problem connecting to TSDB:", err)
+	}
+	defer tsd.Close()
 
 	// Start listening for agent advertisements
 	tc, err := comms.New(cfg)

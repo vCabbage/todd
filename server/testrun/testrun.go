@@ -32,11 +32,11 @@ type TestRunner struct {
 	srv   *server.Server
 	db    db.Database
 	comms comms.Comms
-	tsdb  tsdb.Package
+	tsdb  tsdb.TSDB
 }
 
 // New returns a new TestRunner.
-func New(cfg *config.Config, srv *server.Server, d db.Database, comm comms.Comms, ts tsdb.Package) *TestRunner {
+func New(cfg *config.Config, srv *server.Server, d db.Database, comm comms.Comms, ts tsdb.TSDB) *TestRunner {
 	return &TestRunner{
 		cfg:   cfg,
 		srv:   srv,

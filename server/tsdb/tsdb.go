@@ -11,38 +11,39 @@
 package tsdb
 
 import (
-	"os"
+	"sync"
 
-	log "github.com/Sirupsen/logrus"
-
+	"github.com/pkg/errors"
 	"github.com/toddproject/todd/config"
 )
 
-// Package represents all of the behavior that a ToDD TSDB plugin must support
-type Package interface {
-	WriteData(string, string, string, map[string]map[string]map[string]interface{}) error
+// TSDB represents all of the behavior that a ToDD TSDB plugin must support
+type TSDB interface {
+	WriteData(testUUID, testRunName, groupName string, testData map[string]map[string]map[string]interface{}) error
+	Close() error
 }
 
-// toddTSDB is a struct to hold anything that satisfies the databasePackage interface
-type toddTSDB struct {
-	Package
-}
-
-// NewToddTSDB will create a new instance of toddTSDB, and load the desired
+// New will create a new instance of toddTSDB, and load the desired
 // databasePackage-compatible comms package into it.
-func NewToddTSDB(cfg *config.Config) *toddTSDB { // TODO: return Package instead of *struct embedding Package
-
-	// Create toddTSDB instance
-	var tsdb toddTSDB
-
+func New(cfg *config.Config) (TSDB, error) { // TODO: return Package instead of *struct embedding Package
 	// Load the appropriate TSDB package based on config file
-	switch cfg.TSDB.Plugin {
-	case "influxdb":
-		tsdb.Package = newInfluxDB(cfg)
-	default:
-		log.Error("Invalid DB plugin in config file")
-		os.Exit(1)
+	construct, ok := packages[cfg.TSDB.Plugin]
+	if !ok {
+		return nil, errors.Errorf("Invalid TSDB plugin in config file: %q", cfg.TSDB.Plugin)
 	}
 
-	return &tsdb
+	return construct(cfg)
+}
+
+type constructor func(*config.Config) (TSDB, error)
+
+var (
+	packagesMu sync.Mutex
+	packages   = make(map[string]constructor)
+)
+
+func register(name string, c constructor) {
+	packagesMu.Lock()
+	packages[name] = c
+	packagesMu.Unlock()
 }
