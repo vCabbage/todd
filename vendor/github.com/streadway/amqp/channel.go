@@ -6,7 +6,6 @@
 package amqp
 
 import (
-	"container/heap"
 	"reflect"
 	"sync"
 )
@@ -54,15 +53,9 @@ type Channel struct {
 	// a consumer has been cancelled.
 	cancels []chan string
 
-	// Listeners for Acks/Nacks when the channel is in Confirm mode
-	// the value is the sequentially increasing delivery tag
-	// starting at 1 immediately after the Confirm
-	acks  []chan uint64
-	nacks []chan uint64
-
-	// When in confirm mode, track publish counter and order confirms
-	confirms       tagSet
-	publishCounter uint64
+	// Allocated when in confirm mode in order to track publish counter and order confirms
+	confirms   *confirms
+	confirming bool
 
 	// Selects on any errors from shutdown during RPC
 	errors chan *Error
@@ -87,6 +80,7 @@ func newChannel(c *Connection, id uint16) *Channel {
 		id:         id,
 		rpc:        make(chan message),
 		consumers:  makeConsumers(),
+		confirms:   newConfirms(),
 		recv:       (*Channel).recvMethod,
 		send:       (*Channel).sendOpen,
 		errors:     make(chan *Error, 1),
@@ -132,22 +126,8 @@ func (me *Channel) shutdown(e *Error) {
 			close(c)
 		}
 
-		// A seen map to keep from double closing the ack and nacks. the other
-		// channels are different types and are not shared
-		seen := make(map[chan uint64]bool)
-
-		for _, c := range me.acks {
-			if !seen[c] {
-				close(c)
-				seen[c] = true
-			}
-		}
-
-		for _, c := range me.nacks {
-			if !seen[c] {
-				close(c)
-				seen[c] = true
-			}
+		if me.confirms != nil {
+			me.confirms.Close()
 		}
 
 		me.noNotify = true
@@ -217,7 +197,15 @@ func (me *Channel) sendOpen(msg message) (err error) {
 	if content, ok := msg.(messageWithContent); ok {
 		props, body := content.getContent()
 		class, _ := content.id()
-		size := me.connection.Config.FrameSize - frameHeaderSize
+
+		// catch client max frame size==0 and server max frame size==0
+		// set size to length of what we're trying to publish
+		var size int
+		if me.connection.Config.FrameSize > 0 {
+			size = me.connection.Config.FrameSize - frameHeaderSize
+		} else {
+			size = len(body)
+		}
 
 		if err = me.connection.send(&methodFrame{
 			ChannelId: me.id,
@@ -235,6 +223,7 @@ func (me *Channel) sendOpen(msg message) (err error) {
 			return
 		}
 
+		// chunk body into size (max frame size - frame header size)
 		for i, j := 0, size; i < len(body); i, j = j, j+size {
 			if j > len(body) {
 				j = len(body)
@@ -284,17 +273,21 @@ func (me *Channel) dispatch(msg message) {
 		}
 
 	case *basicAck:
-		if m.Multiple {
-			me.confimMultiple(m.DeliveryTag, me.acks)
-		} else {
-			me.confimOne(m.DeliveryTag, me.acks)
+		if me.confirming {
+			if m.Multiple {
+				me.confirms.Multiple(Confirmation{m.DeliveryTag, true})
+			} else {
+				me.confirms.One(Confirmation{m.DeliveryTag, true})
+			}
 		}
 
 	case *basicNack:
-		if m.Multiple {
-			me.confimMultiple(m.DeliveryTag, me.nacks)
-		} else {
-			me.confimOne(m.DeliveryTag, me.nacks)
+		if me.confirming {
+			if m.Multiple {
+				me.confirms.Multiple(Confirmation{m.DeliveryTag, false})
+			} else {
+				me.confirms.One(Confirmation{m.DeliveryTag, false})
+			}
 		}
 
 	case *basicDeliver:
@@ -459,7 +452,7 @@ messages.
 basic.flow-ok methods will always be returned to the server regardless of
 the number of listeners there are.
 
-To control the flow of deliveries from the server.  Use the Channel.Flow()
+To control the flow of deliveries from the server, use the Channel.Flow()
 method instead.
 
 Note: RabbitMQ will rather use TCP pushback on the network connection instead
@@ -508,7 +501,7 @@ func (me *Channel) NotifyReturn(c chan Return) chan Return {
 /*
 NotifyCancel registers a listener for basic.cancel methods.  These can be sent
 from the server when a queue is deleted or when consuming from a mirrored queue
-where the master has just failed (and was moved to another node)
+where the master has just failed (and was moved to another node).
 
 The subscription tag is returned to the listener.
 
@@ -527,91 +520,66 @@ func (me *Channel) NotifyCancel(c chan string) chan string {
 }
 
 /*
-NotifyConfirm registers a listener chan for reliable publishing to receive
-basic.ack and basic.nack messages.  These messages will be sent by the server
-for every publish after Channel.Confirm has been called.  The value sent on
-these channels is the sequence number of the publishing.  It is up to client of
-this channel to maintain the sequence number of each publishing and handle
-resends on basic.nack.
+NotifyConfirm calls NotifyPublish and starts a goroutine sending
+ordered Ack and Nack DeliveryTag to the respective channels.
 
-There will be either at most one Ack or Nack delivered for every Publishing.
-
-Acknowledgments will be received in the order of delivery from the
-NotifyConfirm channels even if the server acknowledges them out of order.
-
-The capacity of the ack and nack channels must be at least as large as the
-number of outstanding publishings.  Not having enough buffered chans will
-create a deadlock if you attempt to perform other operations on the Connection
-or Channel while confirms are in-flight.
-
-It's advisable to wait for all acks or nacks to arrive before calling
-Channel.Close().
-
+For strict ordering, use NotifyPublish instead.
 */
 func (me *Channel) NotifyConfirm(ack, nack chan uint64) (chan uint64, chan uint64) {
-	me.m.Lock()
-	defer me.m.Unlock()
+	confirms := me.NotifyPublish(make(chan Confirmation, len(ack)+len(nack)))
 
-	if me.noNotify {
+	go func() {
+		for c := range confirms {
+			if c.Ack {
+				ack <- c.DeliveryTag
+			} else {
+				nack <- c.DeliveryTag
+			}
+		}
 		close(ack)
-		close(nack)
-	} else {
-		me.acks = append(me.acks, ack)
-		me.nacks = append(me.nacks, nack)
-	}
+		if nack != ack {
+			close(nack)
+		}
+	}()
 
 	return ack, nack
 }
 
-// Since the acknowledgments may come out of order, scan the heap
-// until found.  In most cases, only the head will be found.
-func (me *Channel) confimOne(tag uint64, ch []chan uint64) {
+/*
+NotifyPublish registers a listener for reliable publishing. Receives from this
+chan for every publish after Channel.Confirm will be in order starting with
+DeliveryTag 1.
+
+There will be one and only one Confirmation Publishing starting with the
+delivery tag of 1 and progressing sequentially until the total number of
+Publishings have been seen by the server.
+
+Acknowledgments will be received in the order of delivery from the
+NotifyPublish channels even if the server acknowledges them out of order.
+
+The listener chan will be closed when the Channel is closed.
+
+The capacity of the chan Confirmation must be at least as large as the
+number of outstanding publishings.  Not having enough buffered chans will
+create a deadlock if you attempt to perform other operations on the Connection
+or Channel while confirms are in-flight.
+
+It's advisable to wait for all Confirmations to arrive before calling
+Channel.Close() or Connection.Close().
+
+*/
+func (me *Channel) NotifyPublish(confirm chan Confirmation) chan Confirmation {
 	me.m.Lock()
 	defer me.m.Unlock()
 
-	if me.confirms != nil {
-		var unacked []uint64
-
-		for {
-			// We expect once and only once delivery
-			next := heap.Pop(&me.confirms).(uint64)
-
-			if next != tag {
-				unacked = append(unacked, next)
-			} else {
-				for _, c := range ch {
-					c <- tag
-				}
-				break
-			}
-		}
-
-		for _, pending := range unacked {
-			heap.Push(&me.confirms, pending)
-		}
+	if me.noNotify {
+		close(confirm)
+	} else {
+		me.confirms.Listen(confirm)
 	}
-}
 
-// Instead of pushing the pending acknowledgments, deliver them as we should ack
-// all up until this tag.
-func (me *Channel) confimMultiple(tag uint64, ch []chan uint64) {
-	me.m.Lock()
-	defer me.m.Unlock()
+	return confirm
 
-	if me.confirms != nil {
-		for {
-			// We expect once and only once delivery
-			next := heap.Pop(&me.confirms).(uint64)
-
-			for _, c := range ch {
-				c <- next
-			}
-
-			if next == tag {
-				break
-			}
-		}
-	}
 }
 
 /*
@@ -638,7 +606,7 @@ To get round-robin behavior between consumers consuming from the same queue on
 different connections, set the prefetch count to 1, and the next available
 message on the server will be delivered to the next available consumer.
 
-If your consumer work time is reasonably is consistent and not much greater
+If your consumer work time is reasonably consistent and not much greater
 than two times your network round trip time, you will see significant
 throughput improvements starting with a prefetch count of 2 or slightly
 greater as described by benchmarks on RabbitMQ.
@@ -670,9 +638,9 @@ Continue consuming from the chan Delivery provided by Channel.Consume until the
 chan closes.
 
 When noWait is true, do not wait for the server to acknowledge the cancel.
-Only use this when you are certain there are no deliveries requiring
-acknowledgment are in-flight otherwise they will arrive and be dropped in the
-client without an ack and will not be redelivered to other consumers.
+Only use this when you are certain there are no deliveries in flight that
+require an acknowledgment, otherwise they will arrive and be dropped in the
+client without an ack, and will not be redelivered to other consumers.
 
 */
 func (me *Channel) Cancel(consumer string, noWait bool) error {
@@ -706,14 +674,14 @@ the type "direct" with the routing key matching the queue's name.  With this
 default binding, it is possible to publish messages that route directly to
 this queue by publishing to "" with the routing key of the queue name.
 
-  QueueDeclare("alerts", true, false, false false, false, nil)
+  QueueDeclare("alerts", true, false, false, false, nil)
   Publish("", "alerts", false, false, Publishing{Body: []byte("...")})
 
   Delivery       Exchange  Key       Queue
   -----------------------------------------------
   key: alerts -> ""     -> alerts -> alerts
 
-The queue name may be empty, in which the server will generate a unique name
+The queue name may be empty, in which case the server will generate a unique name
 which will be returned in the Name field of Queue struct.
 
 Durable and Non-Auto-Deleted queues will survive server restarts and remain
@@ -733,20 +701,20 @@ for temporary topologies that may have long delays between consumer activity.
 These queues can only be bound to non-durable exchanges.
 
 Durable and Auto-Deleted queues will be restored on server restart, but without
-active consumers, will not survive and be removed.  This Lifetime is unlikely
+active consumers will not survive and be removed.  This Lifetime is unlikely
 to be useful.
 
 Exclusive queues are only accessible by the connection that declares them and
 will be deleted when the connection closes.  Channels on other connections
-will receive an error when attempting declare, bind, consume, purge or delete a
-queue with the same name.
+will receive an error when attempting  to declare, bind, consume, purge or
+delete a queue with the same name.
 
 When noWait is true, the queue will assume to be declared on the server.  A
 channel exception will arrive if the conditions are met for existing queues
 or attempting to modify an existing queue from a different connection.
 
 When the error return value is not nil, you can assume the queue could not be
-declared with these parameters and the channel will be closed.
+declared with these parameters, and the channel will be closed.
 
 */
 func (me *Channel) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args Table) (Queue, error) {
@@ -830,10 +798,10 @@ func (me *Channel) QueueDeclarePassive(name string, durable, autoDelete, exclusi
 
 /*
 QueueInspect passively declares a queue by name to inspect the current message
-count, consumer count.
+count and consumer count.
 
-Use this method to check how many unacknowledged messages reside in the queue
-and how many consumers are receiving deliveries and whether a queue by this
+Use this method to check how many unacknowledged messages reside in the queue,
+how many consumers are receiving deliveries, and whether a queue by this
 name already exists.
 
 If the queue by this name exists, use Channel.QueueDeclare check if it is
@@ -1019,7 +987,7 @@ deliveries will be requeued at the end of the same queue.
 
 The consumer is identified by a string that is unique and scoped for all
 consumers on this channel.  If you wish to eventually cancel the consumer, use
-the same non-empty idenfitier in Channel.Cancel.  An empty string will cause
+the same non-empty identifier in Channel.Cancel.  An empty string will cause
 the library to generate a unique identity.  The consumer identity will be
 included in every Delivery in the ConsumerTag field
 
@@ -1099,7 +1067,7 @@ Errors returned from this method will close the channel.
 Exchange names starting with "amq." are reserved for pre-declared and
 standardized exchanges. The client MAY declare an exchange starting with
 "amq." if the passive option is set, or the exchange already exists.  Names can
-consists of a non-empty sequence of letters, digits, hyphen, underscore,
+consist of a non-empty sequence of letters, digits, hyphen, underscore,
 period, or colon.
 
 Each exchange belongs to one of a set of exchange kinds/types implemented by
@@ -1131,7 +1099,7 @@ durable, so queues that bind to these pre-declared exchanges must also be
 durable.
 
 Exchanges declared as `internal` do not accept accept publishings. Internal
-exchanges are useful for when you wish to implement inter-exchange topologies
+exchanges are useful when you wish to implement inter-exchange topologies
 that should not be exposed to users of the broker.
 
 When noWait is true, declare without waiting for a confirmation from the server.
@@ -1315,13 +1283,16 @@ error or lack of an error does not indicate whether the server has received this
 publishing.
 
 It is possible for publishing to not reach the broker if the underlying socket
-is shutdown without pending publishing packets being flushed from the kernel
+is shut down without pending publishing packets being flushed from the kernel
 buffers.  The easy way of making it probable that all publishings reach the
 server is to always call Connection.Close before terminating your publishing
 application.  The way to ensure that all publishings reach the server is to add
-a listener to Channel.NotifyConfirm and keep track of the server acks and nacks
-for every publishing you publish, only exiting when all publishings are
-accounted for.
+a listener to Channel.NotifyPublish and put the channel in confirm mode with
+Channel.Confirm.  Publishing delivery tags and their corresponding
+confirmations start at 1.  Exit when all publishings are confirmed.
+
+When Publish does not return an error and the channel is in confirm mode, the
+internal counter for DeliveryTags with the first confirmation starts at 1.
 
 */
 func (me *Channel) Publish(exchange, key string, mandatory, immediate bool, msg Publishing) error {
@@ -1357,10 +1328,8 @@ func (me *Channel) Publish(exchange, key string, mandatory, immediate bool, msg 
 		return err
 	}
 
-	me.publishCounter += 1
-
-	if me.confirms != nil {
-		heap.Push(&me.confirms, me.publishCounter)
+	if me.confirming {
+		me.confirms.Publish()
 	}
 
 	return nil
@@ -1371,9 +1340,9 @@ Get synchronously receives a single Delivery from the head of a queue from the
 server to the client.  In almost all cases, using Channel.Consume will be
 preferred.
 
-If there was a delivery waiting on the queue and that delivery was received the
+If there was a delivery waiting on the queue and that delivery was received, the
 second return value will be true.  If there was no delivery waiting or an error
-occured, the ok bool will be false.
+occurred, the ok bool will be false.
 
 All deliveries must be acknowledged including those from Channel.Get.  Call
 Delivery.Ack on the returned delivery when you have fully processed this
@@ -1485,12 +1454,12 @@ func (me *Channel) Flow(active bool) error {
 Confirm puts this channel into confirm mode so that the client can ensure all
 publishings have successfully been received by the server.  After entering this
 mode, the server will send a basic.ack or basic.nack message with the deliver
-tag set to a 1 based incrementing index corresponding to every publishing
+tag set to a 1 based incremental index corresponding to every publishing
 received after the this method returns.
 
-Add a listener to Channel.NotifyConfirm to respond to the acknowledgments and
-negative acknowledgments before publishing.  If Channel.NotifyConfirm is not
-called, the Ack/Nacks will be silently ignored.
+Add a listener to Channel.NotifyPublish to respond to the Confirmations. If
+Channel.NotifyPublish is not called, the Confirmations will be silently
+ignored.
 
 The order of acknowledgments is not bound to the order of deliveries.
 
@@ -1499,7 +1468,7 @@ Ack and Nack confirmations will arrive at some point in the future.
 Unroutable mandatory or immediate messages are acknowledged immediately after
 any Channel.NotifyReturn listeners have been notified.  Other messages are
 acknowledged when all queues that should have the message routed to them have
-either have received acknowledgment of delivery or have enqueued the message,
+either received acknowledgment of delivery or have enqueued the message,
 persisting the message if necessary.
 
 When noWait is true, the client will not wait for a response.  A channel
@@ -1517,8 +1486,7 @@ func (me *Channel) Confirm(noWait bool) error {
 		return err
 	}
 
-	// Indicates we're in confirm mode
-	me.confirms = make(tagSet, 0)
+	me.confirming = true
 
 	return nil
 }
