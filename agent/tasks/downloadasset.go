@@ -36,14 +36,14 @@ func (dat DownloadAssetTask) Run() error {
 	// Iterate over the slice of collectors and download them.
 	for x := range dat.Assets {
 
-		assetUrl := dat.Assets[x]
+		assetURL := dat.Assets[x]
 
 		assetDir := ""
 
 		switch {
-		case strings.Contains(assetUrl, "factcollectors"):
+		case strings.Contains(assetURL, "factcollectors"):
 			assetDir = dat.CollectorDir
-		case strings.Contains(assetUrl, "testlets"):
+		case strings.Contains(assetURL, "testlets"):
 			assetDir = dat.TestletDir
 		default:
 			errorMsg := "Invalid asset download URL received"
@@ -51,7 +51,7 @@ func (dat DownloadAssetTask) Run() error {
 			return errors.New(errorMsg)
 		}
 
-		err := dat.downloadAsset(assetUrl, assetDir)
+		err := dat.downloadAsset(assetURL, assetDir)
 		if err != nil {
 			log.Error(err)
 			return err
@@ -72,17 +72,21 @@ func (dat DownloadAssetTask) downloadAsset(url, directory string) error {
 	// TODO: What if this already exists? Consider checking file existence first with io.IsExist?
 	output, err := dat.Fs.Create(fileName)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error while creating", fileName, "-", err))
+		return fmt.Errorf("Error while creating %s - %v", fileName, err)
 	}
 	defer output.Close()
 
 	response, err := dat.HTTPClient.Get(url)
-	defer response.Body.Close()
-	if err != nil || response.StatusCode != 200 {
-
+	if err != nil {
 		// If we have a problem retrieving the testlet, we want to return immediately,
 		// instead of writing an empty file to disk
-		log.Error(fmt.Sprintf("Error while downloading '%s': %s", url, response.Status))
+		log.Errorf("Error while downloading '%s': %v", url, err)
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		log.Errorf("Error while downloading '%s': %s", url, response.Status)
 		return err
 	}
 

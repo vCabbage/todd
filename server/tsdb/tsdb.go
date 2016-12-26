@@ -18,19 +18,19 @@ import (
 	"github.com/toddproject/todd/config"
 )
 
-// TSDBPackage represents all of the behavior that a ToDD TSDB plugin must support
-type TSDBPackage interface {
+// Package represents all of the behavior that a ToDD TSDB plugin must support
+type Package interface {
 	WriteData(string, string, string, map[string]map[string]map[string]interface{}) error
 }
 
 // toddTSDB is a struct to hold anything that satisfies the databasePackage interface
 type toddTSDB struct {
-	TSDBPackage
+	Package
 }
 
-// NewToDDComms will create a new instance of toddTSDB, and load the desired
+// NewToddTSDB will create a new instance of toddTSDB, and load the desired
 // databasePackage-compatible comms package into it.
-func NewToddTSDB(cfg config.Config) *toddTSDB {
+func NewToddTSDB(cfg config.Config) *toddTSDB { // TODO: return Package instead of *struct embedding Package
 
 	// Create toddTSDB instance
 	var tsdb toddTSDB
@@ -38,7 +38,7 @@ func NewToddTSDB(cfg config.Config) *toddTSDB {
 	// Load the appropriate TSDB package based on config file
 	switch cfg.TSDB.Plugin {
 	case "influxdb":
-		tsdb.TSDBPackage = newInfluxDB(cfg)
+		tsdb.Package = newInfluxDB(cfg)
 	default:
 		log.Error("Invalid DB plugin in config file")
 		os.Exit(1)

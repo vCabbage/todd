@@ -17,7 +17,7 @@ import (
 )
 
 // Delete will send a request to remove an existing ToDD Object
-func (capi ClientApi) Delete(conf map[string]string, objType, objLabel string) error {
+func (capi ClientAPI) Delete(conf map[string]string, objType, objLabel string) error {
 
 	// If insufficient subargs were provided, error out
 	if objType == "" || objLabel == "" {
@@ -34,16 +34,14 @@ func (capi ClientApi) Delete(conf map[string]string, objType, objLabel string) e
 	}
 
 	// Marshal deleteinfo into JSON
-	json_str, err := json.Marshal(deleteinfo)
+	jsonByte, err := json.Marshal(deleteinfo)
 	if err != nil {
 		return err
 	}
 
 	// Construct API request, and send POST to server for this object
-	var url string
-	url = fmt.Sprintf("http://%s:%s/v1/object/delete", conf["host"], conf["port"])
+	url := fmt.Sprintf("http://%s:%s/v1/object/delete", conf["host"], conf["port"])
 
-	var jsonByte = []byte(json_str)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonByte))
 	if err != nil {
 		return err

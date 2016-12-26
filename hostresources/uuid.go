@@ -16,11 +16,9 @@ import (
 	"strconv"
 )
 
-var UUID []byte
-
 var validShortID = regexp.MustCompile("^[a-z0-9]{12}$")
 
-// Determine if an arbitrary string *looks like* a short ID.
+// IsShortID determine if an arbitrary string *looks like* a short ID.
 func IsShortID(id string) bool {
 	return validShortID.MatchString(id)
 }
@@ -37,8 +35,8 @@ func TruncateID(id string) string {
 	return id[:trimTo]
 }
 
-// GenerateUuid returns an unique id
-func GenerateUuid() string {
+// GenerateUUID returns an unique id
+func GenerateUUID() string {
 	for {
 		id := make([]byte, 32)
 		if _, err := io.ReadFull(rand.Reader, id); err != nil {

@@ -29,7 +29,7 @@ import (
 type ExecuteTestRunTask struct {
 	BaseTask
 	Config    config.Config `json:"-"`
-	TestUuid  string        `json:"testuuid"`
+	TestUUID  string        `json:"testuuid"`
 	TimeLimit int           `json:"timelimit"`
 }
 
@@ -55,13 +55,13 @@ func (ett ExecuteTestRunTask) Run() error {
 
 	// Retrieve test from cache by UUID
 	var ac = cache.NewAgentCache(ett.Config)
-	tr, err := ac.GetTestRun(ett.TestUuid)
+	tr, err := ac.GetTestRun(ett.TestUUID)
 	if err != nil {
 		log.Error(err)
 		return errors.New("Problem retrieving testrun from agent cache")
 	}
 
-	log.Debugf("IMMA FIRIN MAH LAZER (for test %s) ", ett.TestUuid)
+	log.Debugf("IMMA FIRIN MAH LAZER (for test %s) ", ett.TestUUID)
 
 	// Specify size of wait group equal to number of targets
 	wg.Add(len(tr.Targets))
@@ -134,7 +134,7 @@ func (ett ExecuteTestRunTask) Run() error {
 
 	wg.Wait()
 
-	testdata_json, err := json.Marshal(gatheredData)
+	testdataJSON, err := json.Marshal(gatheredData)
 	if err != nil {
 		log.Errorf("Failed to marshal post-test data %v", err)
 		// TODO(mierdin): This gets triggered for all iperf servers, because they don't provide metrics.
@@ -142,12 +142,12 @@ func (ett ExecuteTestRunTask) Run() error {
 	}
 
 	// Write test data to agent cache
-	err = ac.UpdateTestRunData(ett.TestUuid, string(testdata_json))
+	err = ac.UpdateTestRunData(ett.TestUUID, string(testdataJSON))
 	if err != nil {
 		log.Fatal("Failed to install post-test data into cache")
 		os.Exit(1)
 	} else {
-		log.Debugf("Wrote combined post-test data for %s to cache", ett.TestUuid)
+		log.Debugf("Wrote combined post-test data for %s to cache", ett.TestUUID)
 	}
 
 	return nil

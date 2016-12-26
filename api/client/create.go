@@ -24,7 +24,7 @@ import (
 
 // Create is responsible for pushing a ToDD object to the server for eventual storage in whatever database is being used
 // It will send a ToddObject rendered as JSON to the "createobject" method of the ToDD API
-func (capi ClientApi) Create(conf map[string]string, yamlFileName string) error {
+func (capi ClientAPI) Create(conf map[string]string, yamlFileName string) error {
 
 	// Pull YAML from either stdin or from the filename if stdin is empty
 	yamlDef, err := getYAMLDef(yamlFileName)
@@ -45,48 +45,46 @@ func (capi ClientApi) Create(conf map[string]string, yamlFileName string) error 
 
 	switch baseobj.Type {
 	case "group":
-		var group_obj objects.GroupObject
-		err = yaml.Unmarshal(yamlDef, &group_obj)
+		var groupObj objects.GroupObject
+		err = yaml.Unmarshal(yamlDef, &groupObj)
 		if err != nil {
 			return errors.New("Group YAML object not in correct format")
 		}
-		finalobj = group_obj
+		finalobj = groupObj
 	case "testrun":
-		var testrun_obj objects.TestRunObject
-		err = yaml.Unmarshal(yamlDef, &testrun_obj)
+		var testrunObj objects.TestRunObject
+		err = yaml.Unmarshal(yamlDef, &testrunObj)
 		if err != nil {
 			return errors.New("Testrun YAML object not in correct format")
 		}
 
-		if testrun_obj.Spec.TargetType == "group" {
+		if testrunObj.Spec.TargetType == "group" {
 
 			// We need to do a quick conversion because JSON does not support non-string
 			// keys, and would reject this during Marshal if we don't.
-			stringified_map := make(map[string]string)
-			for k, v := range testrun_obj.Spec.Target.(map[interface{}]interface{}) {
-				stringified_map[k.(string)] = v.(string)
+			stringifiedMap := make(map[string]string)
+			for k, v := range testrunObj.Spec.Target.(map[interface{}]interface{}) {
+				stringifiedMap[k.(string)] = v.(string)
 			}
-			testrun_obj.Spec.Target = stringified_map
+			testrunObj.Spec.Target = stringifiedMap
 
 		}
 
-		finalobj = testrun_obj
+		finalobj = testrunObj
 
 	default:
 		return errors.New("Invalid object type provided")
 	}
 
 	// Marshal the final object into JSON
-	json_str, err := json.Marshal(finalobj)
+	jsonByte, err := json.Marshal(finalobj)
 	if err != nil {
 		return errors.New("Problem marshalling the final object into JSON")
 	}
 
 	// Construct API request, and send POST to server for this object
-	var url string
-	url = fmt.Sprintf("http://%s:%s/v1/object/create", conf["host"], conf["port"])
+	url := fmt.Sprintf("http://%s:%s/v1/object/create", conf["host"], conf["port"])
 
-	var jsonByte = []byte(json_str)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonByte))
 	if err != nil {
 		return err

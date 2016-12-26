@@ -9,7 +9,6 @@
 package tasks
 
 import (
-	"errors"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
@@ -36,11 +35,11 @@ func (sgt SetGroupTask) Run() error {
 	if ac.GetKeyValue("group") != sgt.GroupName {
 		err := ac.SetKeyValue("group", sgt.GroupName)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Failed to set keyvalue pair - %s:%s", "group", sgt.GroupName))
+			return fmt.Errorf("Failed to set keyvalue pair - %s:%s", "group", sgt.GroupName)
 		}
 		err = ac.SetKeyValue("unackedGroup", "true")
 		if err != nil {
-			return errors.New(fmt.Sprintf("Failed to set keyvalue pair - %s:%s", "unackedGroup", "true"))
+			return fmt.Errorf("Failed to set keyvalue pair - %s:%s", "unackedGroup", "true")
 		}
 	} else {
 		log.Info("Already in the group being dictated by the server: ", sgt.GroupName)

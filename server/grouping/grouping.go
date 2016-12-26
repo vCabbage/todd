@@ -38,14 +38,14 @@ func CalculateGroups(cfg config.Config) {
 	}
 
 	// Retrieve all objects with type "group"
-	group_objs, err := tdb.GetObjects("group")
+	groupObs, err := tdb.GetObjects("group")
 	if err != nil {
 		log.Fatalf("Error retrieving groups: %v", err)
 	}
 
 	// Cast retrieved slice of ToddObject interfaces to actual GroupObjects
-	groups := make([]objects.GroupObject, len(group_objs))
-	for i, gobj := range group_objs {
+	groups := make([]objects.GroupObject, len(groupObs))
+	for i, gobj := range groupObs {
 		groups[i] = gobj.(objects.GroupObject)
 	}
 
@@ -64,8 +64,8 @@ next:
 			if isInGroup(groups[i].Spec.Matches, agents[x].Facts) {
 
 				// Insert this group name ("Label") into groupmap under the key of the UUID for the agent that belongs to it
-				log.Debugf("Agent %s is in group %s\n", agents[x].Uuid, groups[i].Label)
-				groupmap[agents[x].Uuid] = groups[i].Label
+				log.Debugf("Agent %s is in group %s\n", agents[x].UUID, groups[i].Label)
+				groupmap[agents[x].UUID] = groups[i].Label
 				continue next
 
 			}
@@ -95,7 +95,7 @@ next:
 		}
 
 		setGroupTask.Type = "SetGroup" //TODO(mierdin): Apparently this is necessary because inner type promotion doesn't apply for struct literals?
-		tc.CommsPackage.SendTask(uuid, setGroupTask)
+		tc.Package.SendTask(uuid, setGroupTask)
 	}
 
 	// need to send a message to all agents that weren't in groupmap to set their group to nothing
@@ -105,7 +105,7 @@ next:
 		}
 
 		setGroupTask.Type = "SetGroup" //TODO(mierdin): Apparently this is necessary because inner type promotion doesn't apply for struct literals?
-		tc.CommsPackage.SendTask(lonelyAgents[x].Uuid, setGroupTask)
+		tc.Package.SendTask(lonelyAgents[x].UUID, setGroupTask)
 	}
 }
 
@@ -119,28 +119,28 @@ next:
 // - within_subnet
 //
 // In the future, this functionality will be made much more generic, in order to take advantage of any user-defined fact collectors.
-func isInGroup(match_statements []map[string]string, factmap map[string][]string) bool {
+func isInGroup(matchStatements []map[string]string, factmap map[string][]string) bool {
 
 	// Iterate over the match statements
-	for x := range match_statements {
+	for x := range matchStatements {
 
 		// If a "hostname" statement is present, perform a check
-		if _, ok := match_statements[x]["hostname"]; ok {
+		if _, ok := matchStatements[x]["hostname"]; ok {
 
 			// Continue if no "Hostname" fact present
 			if _, ok := factmap["Hostname"]; !ok {
 				continue
 			}
 
-			exp, err := regexp.Compile(match_statements[x]["hostname"])
+			exp, err := regexp.Compile(matchStatements[x]["hostname"])
 			if err != nil {
 				log.Warn("Unable to compile provided regular expression in group object")
 				continue
 			}
 
-			regex_strs := factmap["Hostname"]
-			for j := range match_statements {
-				result := exp.Find([]byte(regex_strs[j]))
+			regexStrs := factmap["Hostname"]
+			for j := range matchStatements {
+				result := exp.Find([]byte(regexStrs[j]))
 				if result != nil {
 					return true
 				}
@@ -149,26 +149,26 @@ func isInGroup(match_statements []map[string]string, factmap map[string][]string
 		}
 
 		// If a "within_subnet" statement is present, perform a check
-		if _, ok := match_statements[x]["within_subnet"]; ok {
+		if _, ok := matchStatements[x]["within_subnet"]; ok {
 
 			// Continue if no "Addresses" fact present
 			if _, ok := factmap["Addresses"]; !ok {
 				continue
 			}
 
-			this_subnet := match_statements[x]["within_subnet"]
+			thisSubnet := matchStatements[x]["within_subnet"]
 
 			// First, we retrieve the desired subnet from the grouping object, and convert to net.IPNet
-			_, desired_net, err := net.ParseCIDR(this_subnet)
+			_, desiredNet, err := net.ParseCIDR(thisSubnet)
 			if err != nil {
-				log.Errorf("Problem parsing desired network in grouping object: ", this_subnet)
+				log.Errorf("Problem parsing desired network in grouping object: %q", thisSubnet)
 			}
 
 			addresses := factmap["Addresses"]
 
 			for y := range addresses {
 
-				if desired_net.Contains(net.ParseIP(addresses[y])) {
+				if desiredNet.Contains(net.ParseIP(addresses[y])) {
 					return true
 				}
 			}

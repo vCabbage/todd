@@ -21,7 +21,7 @@ import (
 )
 
 var testAgent = defs.AgentAdvert{
-	Uuid:        "aaaaaaaaaaaaaaaaaaaaaa",
+	UUID:        "aaaaaaaaaaaaaaaaaaaaaa",
 	DefaultAddr: "192.168.0.1",
 	Expires:     27000000000,
 	LocalTime:   time.Now(),
@@ -45,13 +45,13 @@ func TestAgents(t *testing.T) {
 
 	testAgentSlice := []defs.AgentAdvert{testAgent}
 
-	agentJson, err := json.Marshal(testAgentSlice)
+	agentJSON, err := json.Marshal(testAgentSlice)
 	if err != nil {
 		t.Error(err)
 	}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(agentJson)
+		w.Write(agentJSON)
 	}))
 	defer ts.Close()
 
@@ -65,7 +65,7 @@ func TestAgents(t *testing.T) {
 		t.Error(err)
 	}
 
-	var capi ClientApi
+	var capi ClientAPI
 	agents, err := capi.Agents(
 		map[string]string{
 			"host": host,
@@ -93,7 +93,7 @@ var agentTests = []struct {
 
 // TestDisplayAgents iterates over the test cases and runs DisplayAgents on each
 func TestDisplayAgents(t *testing.T) {
-	var capi ClientApi
+	var capi ClientAPI
 	for _, test := range agentTests {
 		err := capi.DisplayAgents(test.arg1, test.arg2)
 		if err != nil {

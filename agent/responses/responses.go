@@ -18,6 +18,6 @@ type Response interface{}
 // are used primarily to house the JSON message for passing responses over the comms package (i.e. message queue), but may also contain important
 // dependencies of the response, such as an HTTP handler.
 type BaseResponse struct {
-	AgentUuid string `json:"agentuuid"`
+	AgentUUID string `json:"agentuuid"`
 	Type      string `json:"type"`
 }

@@ -27,7 +27,7 @@ import (
 )
 
 // Command-line Arguments
-var arg_config string
+var argConfig string
 
 func init() {
 
@@ -42,7 +42,7 @@ func init() {
 		os.Exit(0)
 	}
 
-	flag.StringVar(&arg_config, "config", "/etc/todd/agent.cfg", "ToDD agent config file location")
+	flag.StringVar(&argConfig, "config", "/etc/todd/agent.cfg", "ToDD agent config file location")
 	flag.Parse()
 
 	// TODO(moswalt): Implement configurable loglevel in server and agent
@@ -51,7 +51,7 @@ func init() {
 
 func main() {
 
-	cfg, err := config.GetConfig(arg_config)
+	cfg, err := config.GetConfig(argConfig)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -61,7 +61,7 @@ func main() {
 	ac.Init()
 
 	// Generate UUID
-	uuid := hostresources.GenerateUuid()
+	uuid := hostresources.GenerateUUID()
 	ac.SetKeyValue("uuid", uuid)
 
 	log.Infof("ToDD Agent Activated: %s", uuid)
@@ -78,7 +78,7 @@ func main() {
 	// Spawn goroutine to listen for tasks issued by server
 	go func() {
 		for {
-			err := tc.CommsPackage.ListenForTasks(uuid)
+			err := tc.Package.ListenForTasks(uuid)
 			if err != nil {
 				log.Warn("ListenForTasks reported a failure. Trying again...")
 			}
@@ -86,7 +86,7 @@ func main() {
 	}()
 
 	// Watch for changes to group membership
-	go tc.CommsPackage.WatchForGroup()
+	go tc.Package.WatchForGroup()
 
 	// Continually advertise agent status into message queue
 	for {
@@ -103,7 +103,7 @@ func main() {
 
 		// Create an AgentAdvert instance to represent this particular agent
 		me := defs.AgentAdvert{
-			Uuid:           uuid,
+			UUID:           uuid,
 			DefaultAddr:    defaultaddr,
 			FactCollectors: gatheredAssets["factcollectors"],
 			Testlets:       gatheredAssets["testlets"],
@@ -112,7 +112,7 @@ func main() {
 		}
 
 		// Advertise this agent
-		err := tc.CommsPackage.AdvertiseAgent(me)
+		err := tc.Package.AdvertiseAgent(me)
 		if err != nil {
 			log.Error("Failed to advertise agent after several retries")
 		}
@@ -130,7 +130,7 @@ func watchForFinishedTestRuns(cfg config.Config) error {
 
 	var ac = cache.NewAgentCache(cfg)
 
-	agentUuid := ac.GetKeyValue("uuid")
+	agentUUID := ac.GetKeyValue("uuid")
 
 	for {
 
@@ -142,27 +142,24 @@ func watchForFinishedTestRuns(cfg config.Config) error {
 			return errors.New("Problem retrieving finished test runs")
 		}
 
-		for testUuid, testData := range testruns {
+		for testUUID, testData := range testruns {
 
-			log.Debug("Found ripe testrun: ", testUuid)
+			log.Debug("Found ripe testrun: ", testUUID)
 
 			utdr := responses.UploadTestDataResponse{
-				TestUuid: testUuid,
+				TestUUID: testUUID,
 				TestData: testData,
 			}
-			utdr.AgentUuid = agentUuid
+			utdr.AgentUUID = agentUUID
 			utdr.Type = "TestData" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 
 			tc, err := comms.NewToDDComms(cfg)
 			if err != nil {
 				return err
 			}
-			tc.CommsPackage.SendResponse(utdr)
+			tc.Package.SendResponse(utdr)
 
 		}
 
 	}
-
-	return nil
-
 }

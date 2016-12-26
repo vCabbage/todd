@@ -37,7 +37,7 @@ func newRabbitMQComms(cfg config.Config) *rabbitMQComms {
 	var rmq rabbitMQComms
 	rmq.config = cfg
 
-	rmq.queueUrl = fmt.Sprintf("amqp://%s:%s@%s:%s/",
+	rmq.queueURL = fmt.Sprintf("amqp://%s:%s@%s:%s/",
 		rmq.config.Comms.User,
 		rmq.config.Comms.Password,
 		rmq.config.Comms.Host,
@@ -49,13 +49,13 @@ func newRabbitMQComms(cfg config.Config) *rabbitMQComms {
 
 type rabbitMQComms struct {
 	config   config.Config
-	queueUrl string
+	queueURL string
 }
 
 // connectRabbitMQ wraps the amqp.Dial function in order to provide connection retry functionality
-func connectRabbitMQ(queueUrl string) (*amqp.Connection, error) {
+func connectRabbitMQ(queueURL string) (*amqp.Connection, error) {
 
-	conn, err := amqp.Dial(queueUrl)
+	conn, err := amqp.Dial(queueURL)
 
 	for retries := 0; err != nil; {
 		if retries > connectRetry {
@@ -74,7 +74,7 @@ func connectRabbitMQ(queueUrl string) (*amqp.Connection, error) {
 func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 
 	// Connect to RabbitMQ with retry logic
-	conn, err := connectRabbitMQ(rmq.queueUrl)
+	conn, err := connectRabbitMQ(rmq.queueURL)
 	if err != nil {
 		log.Error("(AdvertiseAgent) Failed to connect to RabbitMQ")
 		log.Debug(err)
@@ -134,7 +134,7 @@ func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 	}
 
 	// Marshal agent struct to JSON
-	json_data, err := json.Marshal(me)
+	jsonData, err := json.Marshal(me)
 	if err != nil {
 		log.Error("Failed to marshal agent data from queue")
 		log.Debug(err)
@@ -149,7 +149,7 @@ func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Expiration:  "5000", // expiration in milliseconds (we don't want these messages to pile up if the server isn't running)
-			Body:        []byte(json_data),
+			Body:        []byte(jsonData),
 		})
 	if err != nil {
 		log.Error("Failed to publish agent advertisement")
@@ -168,7 +168,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 
 	// TODO(mierdin): does func param need to be a pointer?
 
-	conn, err := amqp.Dial(rmq.queueUrl)
+	conn, err := amqp.Dial(rmq.queueURL)
 	if err != nil {
 		log.Error("(ListenForAgent) Failed to connect to RabbitMQ")
 		log.Debug(err)
@@ -229,32 +229,32 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 			var assetList []string
 
 			// assets is the asset map from the SERVER's perspective
-			for asset_type, asset_hashes := range assets.Assets() {
+			for assetType, assetHashes := range assets.Assets() {
 
 				var agentAssets map[string]string
 
 				// agentAssets is the asset map from the AGENT's perspective
-				if asset_type == "factcollectors" {
+				if assetType == "factcollectors" { // TODO: Use select
 					agentAssets = agent.FactCollectors
-				} else if asset_type == "testlets" {
+				} else if assetType == "testlets" {
 					agentAssets = agent.Testlets
 				}
 
-				for name, hash := range asset_hashes {
+				for name, hash := range assetHashes {
 
 					// See if the hashes match (a missing asset will also result in False)
 					if agentAssets[name] != hash {
 
 						// hashes do not match, so we need to append the asset download URL to the remediate list
-						var default_ip string
-						if rmq.config.LocalResources.IPAddrOverride != "" {
-							default_ip = rmq.config.LocalResources.IPAddrOverride
+						var defaultIP string
+						if rmq.config.LocalResources.IPAddrOverride != "" { // TODO: set defaultIP to override byte default and check if empty
+							defaultIP = rmq.config.LocalResources.IPAddrOverride
 						} else {
-							default_ip = hostresources.GetIPOfInt(rmq.config.LocalResources.DefaultInterface).String()
+							defaultIP = hostresources.GetIPOfInt(rmq.config.LocalResources.DefaultInterface).String()
 						}
-						asset_url := fmt.Sprintf("http://%s:%s/%s/%s", default_ip, rmq.config.Assets.Port, asset_type, name)
+						assetURL := fmt.Sprintf("http://%s:%s/%s/%s", defaultIP, rmq.config.Assets.Port, assetType, name)
 
-						assetList = append(assetList, asset_url)
+						assetList = append(assetList, assetURL)
 
 					}
 				}
@@ -286,12 +286,12 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 				// }
 
 			} else {
-				log.Warnf("Agent %s did not have the required asset files. This advertisement is ignored.", agent.Uuid)
+				log.Warnf("Agent %s did not have the required asset files. This advertisement is ignored.", agent.UUID)
 
 				var task tasks.DownloadAssetTask
 				task.Type = "DownloadAsset" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 				task.Assets = assetList
-				rmq.SendTask(agent.Uuid, task)
+				rmq.SendTask(agent.UUID, task)
 			}
 		}
 	}()
@@ -306,7 +306,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 // that have been added to a group
 func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) error {
 
-	conn, err := amqp.Dial(rmq.queueUrl)
+	conn, err := amqp.Dial(rmq.queueURL)
 	if err != nil {
 		log.Error("(ListenForAgent) Failed to connect to RabbitMQ")
 		log.Debug(err)
@@ -364,7 +364,7 @@ func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) error {
 		return err
 	}
 
-	json_data, err := json.Marshal(task)
+	jsonData, err := json.Marshal(task)
 	if err != nil {
 		log.Error("Failed to marshal object data")
 		log.Debug(err)
@@ -378,7 +378,7 @@ func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) error {
 		false,           // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        []byte(json_data),
+			Body:        []byte(jsonData),
 		})
 	if err != nil {
 		log.Error("Failed to publish a task onto message queue")
@@ -386,7 +386,7 @@ func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) error {
 		return err
 	}
 
-	log.Debugf("Sent task to %s: %s", queueName, json_data)
+	log.Debugf("Sent task to %s: %s", queueName, jsonData)
 
 	return nil
 }
@@ -395,7 +395,7 @@ func (rmq rabbitMQComms) SendTask(queueName string, task tasks.Task) error {
 func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
 	// Connect to RabbitMQ with retry logic
-	conn, err := connectRabbitMQ(rmq.queueUrl)
+	conn, err := connectRabbitMQ(rmq.queueURL)
 	if err != nil {
 		log.Error("(AdvertiseAgent) Failed to connect to RabbitMQ")
 		return err
@@ -442,14 +442,14 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 		for d := range msgs {
 
 			// Unmarshal into BaseTaskMessage to determine type
-			var base_msg tasks.BaseTask
-			err = json.Unmarshal(d.Body, &base_msg)
+			var baseMsg tasks.BaseTask
+			err = json.Unmarshal(d.Body, &baseMsg)
 			// TODO(mierdin): Need to handle this error
 
 			log.Debugf("Agent task received: %s", d.Body)
 
 			// call agent task method based on type
-			switch base_msg.Type {
+			switch baseMsg.Type {
 			case "DownloadAsset":
 
 				downloadAssetTask := tasks.DownloadAssetTask{
@@ -470,42 +470,42 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 
 			case "KeyValue":
 
-				kv_task := tasks.KeyValueTask{
+				kvTask := tasks.KeyValueTask{
 					Config: rmq.config,
 				}
 
-				err = json.Unmarshal(d.Body, &kv_task)
+				err = json.Unmarshal(d.Body, &kvTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = kv_task.Run()
+				err = kvTask.Run()
 				if err != nil {
 					log.Warning("The KeyValue task failed to initialize")
 				}
 
 			case "SetGroup":
 
-				sg_task := tasks.SetGroupTask{
+				sgTask := tasks.SetGroupTask{
 					Config: rmq.config,
 				}
 
-				err = json.Unmarshal(d.Body, &sg_task)
+				err = json.Unmarshal(d.Body, &sgTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = sg_task.Run()
+				err = sgTask.Run()
 				if err != nil {
 					log.Warning("The SetGroup task failed to initialize")
 				}
 
 			case "DeleteTestData":
 
-				dtdt_task := tasks.DeleteTestDataTask{
+				dtdtTask := tasks.DeleteTestDataTask{
 					Config: rmq.config,
 				}
 
-				err = json.Unmarshal(d.Body, &dtdt_task)
+				err = json.Unmarshal(d.Body, &dtdtTask)
 				// TODO(mierdin): Need to handle this error
 
-				err = dtdt_task.Run()
+				err = dtdtTask.Run()
 				if err != nil {
 					log.Warning("The DeleteTestData task failed to initialize")
 				}
@@ -516,19 +516,19 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				var ac = cache.NewAgentCache(rmq.config)
 				uuid := ac.GetKeyValue("uuid")
 
-				itr_task := tasks.InstallTestRunTask{
+				itrTask := tasks.InstallTestRunTask{
 					Config: rmq.config,
 				}
 
-				err = json.Unmarshal(d.Body, &itr_task)
+				err = json.Unmarshal(d.Body, &itrTask)
 				// TODO(mierdin): Need to handle this error
 
 				var response responses.SetAgentStatusResponse
 				response.Type = "AgentStatus" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-				response.AgentUuid = uuid
-				response.TestUuid = itr_task.Tr.Uuid
+				response.AgentUUID = uuid
+				response.TestUUID = itrTask.Tr.UUID
 
-				err = itr_task.Run()
+				err = itrTask.Run()
 				if err != nil {
 					log.Warning("The InstallTestRun task failed to initialize")
 					response.Status = "fail"
@@ -543,23 +543,23 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				var ac = cache.NewAgentCache(rmq.config)
 				uuid := ac.GetKeyValue("uuid")
 
-				etr_task := tasks.ExecuteTestRunTask{
+				etrTask := tasks.ExecuteTestRunTask{
 					Config: rmq.config,
 				}
 
-				err = json.Unmarshal(d.Body, &etr_task)
+				err = json.Unmarshal(d.Body, &etrTask)
 				// TODO(mierdin): Need to handle this error
 
 				// Send status that the testing has begun, right now.
 				response := responses.SetAgentStatusResponse{
-					TestUuid: etr_task.TestUuid,
+					TestUUID: etrTask.TestUUID,
 					Status:   "testing",
 				}
-				response.AgentUuid = uuid     // TODO(mierdin): Can't declare this in the literal, it's that embedding behavior again. Need to figure this out.
+				response.AgentUUID = uuid     // TODO(mierdin): Can't declare this in the literal, it's that embedding behavior again. Need to figure this out.
 				response.Type = "AgentStatus" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
 				rmq.SendResponse(response)
 
-				err = etr_task.Run()
+				err = etrTask.Run()
 				if err != nil {
 					log.Warning("The ExecuteTestRun task failed to initialize")
 					response.Status = "fail"
@@ -567,7 +567,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				}
 
 			default:
-				log.Errorf(fmt.Sprintf("Unexpected type value for received task: %s", base_msg.Type))
+				log.Errorf(fmt.Sprintf("Unexpected type value for received task: %s", baseMsg.Type))
 			}
 		}
 	}()
@@ -632,7 +632,7 @@ rereg:
 func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) error {
 
 	// Connect to RabbitMQ with retry logic
-	conn, err := connectRabbitMQ(rmq.queueUrl)
+	conn, err := connectRabbitMQ(rmq.queueURL)
 	if err != nil {
 		log.Error("(AdvertiseAgent) Failed to connect to RabbitMQ")
 		log.Debug(err)
@@ -683,19 +683,19 @@ func (rmq rabbitMQComms) ListenForGroupTasks(groupName string, dereg chan bool) 
 		for d := range msgs {
 
 			// Unmarshal into BaseTaskMessage to determine type
-			var base_msg tasks.BaseTask
-			err = json.Unmarshal(d.Body, &base_msg)
+			var baseMsg tasks.BaseTask
+			err = json.Unmarshal(d.Body, &baseMsg)
 			// TODO(mierdin): Need to handle this error
 
 			log.Debugf("Agent task received: %s", d.Body)
 
 			// call agent task method based on type
-			switch base_msg.Type {
+			switch baseMsg.Type {
 
 			// This has been removed, as I am moving away from using queues that use the group name.
 
 			default:
-				log.Errorf(fmt.Sprintf("Unexpected type value for received group task: %s", base_msg.Type))
+				log.Errorf(fmt.Sprintf("Unexpected type value for received group task: %s", baseMsg.Type))
 			}
 		}
 	}()
@@ -712,7 +712,7 @@ func (rmq rabbitMQComms) SendResponse(resp responses.Response) error {
 
 	queueName := "agentresponses"
 
-	conn, err := amqp.Dial(rmq.queueUrl)
+	conn, err := amqp.Dial(rmq.queueURL)
 	if err != nil {
 		log.Error("Failed to connect to RabbitMQ")
 		log.Debug(err)
@@ -770,7 +770,7 @@ func (rmq rabbitMQComms) SendResponse(resp responses.Response) error {
 		return err
 	}
 
-	json_data, err := json.Marshal(resp)
+	jsonData, err := json.Marshal(resp)
 	if err != nil {
 		log.Error("Failed to marshal response data")
 		log.Debug(err)
@@ -784,7 +784,7 @@ func (rmq rabbitMQComms) SendResponse(resp responses.Response) error {
 		false,           // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        []byte(json_data),
+			Body:        []byte(jsonData),
 		})
 	if err != nil {
 		log.Error("Failed to publish a response onto message queue")
@@ -792,7 +792,7 @@ func (rmq rabbitMQComms) SendResponse(resp responses.Response) error {
 		return err
 	}
 
-	log.Debugf("Sent response to %s: %s", queueName, json_data)
+	log.Debugf("Sent response to %s: %s", queueName, jsonData)
 
 	return nil
 }
@@ -802,7 +802,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 
 	queueName := "agentresponses"
 
-	conn, err := amqp.Dial(rmq.queueUrl)
+	conn, err := amqp.Dial(rmq.queueURL)
 	if err != nil {
 		log.Error("Failed to connect to RabbitMQ")
 		log.Debug(err)
@@ -858,8 +858,8 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 		for d := range msgs {
 
 			// Unmarshal into BaseResponse to determine type
-			var base_msg responses.BaseResponse
-			err = json.Unmarshal(d.Body, &base_msg)
+			var baseMsg responses.BaseResponse
+			err = json.Unmarshal(d.Body, &baseMsg)
 			if err != nil {
 				log.Error("Problem unmarshalling baseresponse")
 			}
@@ -867,7 +867,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 			log.Debugf("Agent response received: %s", d.Body)
 
 			// call agent response method based on type
-			switch base_msg.Type {
+			switch baseMsg.Type {
 			case "AgentStatus":
 
 				var sasr responses.SetAgentStatusResponse
@@ -876,8 +876,8 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 					log.Error("Problem unmarshalling AgentStatus")
 				}
 
-				log.Debugf("Agent %s is '%s' regarding test %s. Writing to DB.", sasr.AgentUuid, sasr.Status, sasr.TestUuid)
-				err := tdb.SetAgentTestStatus(sasr.TestUuid, sasr.AgentUuid, sasr.Status)
+				log.Debugf("Agent %s is '%s' regarding test %s. Writing to DB.", sasr.AgentUUID, sasr.Status, sasr.TestUUID)
+				err := tdb.SetAgentTestStatus(sasr.TestUUID, sasr.AgentUUID, sasr.Status)
 				if err != nil {
 					log.Errorf("Error writing agent status to DB: %v", err)
 				}
@@ -890,7 +890,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 					log.Error("Problem unmarshalling UploadTestDataResponse")
 				}
 
-				err = tdb.SetAgentTestData(utdr.TestUuid, utdr.AgentUuid, utdr.TestData)
+				err = tdb.SetAgentTestData(utdr.TestUUID, utdr.AgentUUID, utdr.TestData)
 				if err != nil {
 					log.Error("Problem setting agent test data")
 				}
@@ -898,17 +898,17 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 				// Send task to the agent that says to delete the entry
 				var dtdt tasks.DeleteTestDataTask
 				dtdt.Type = "DeleteTestData" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-				dtdt.TestUuid = utdr.TestUuid
-				rmq.SendTask(utdr.AgentUuid, dtdt)
+				dtdt.TestUUID = utdr.TestUUID
+				rmq.SendTask(utdr.AgentUUID, dtdt)
 
 				// Finally, set the status for this agent in the test to "finished"
-				err := tdb.SetAgentTestStatus(dtdt.TestUuid, utdr.AgentUuid, "finished")
+				err := tdb.SetAgentTestStatus(dtdt.TestUUID, utdr.AgentUUID, "finished")
 				if err != nil {
 					log.Errorf("Error writing agent status to DB: %v", err)
 				}
 
 			default:
-				log.Errorf(fmt.Sprintf("Unexpected type value for received response: %s", base_msg.Type))
+				log.Errorf(fmt.Sprintf("Unexpected type value for received response: %s", baseMsg.Type))
 			}
 		}
 	}()
