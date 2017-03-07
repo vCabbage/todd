@@ -23,6 +23,10 @@ fmt:
 
 test: 
 	go test ./... -cover
+	scripts/start-containers.sh integration
+
+lint:
+	scripts/lint.sh
 
 update_deps:
 	go get -u github.com/tools/godep

@@ -15,6 +15,12 @@ branch=${branch:-HEAD}
 
 toddimage=toddproject/todd:$branch
 
+if [ ${PWD:(-7)} == "scripts" ]
+then
+    echo "Please do not run this script directly - use the makefile in the main repo."
+    exit 1
+fi
+
 function dtodd {
     docker run --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" "$@"
     sleep 5
@@ -106,8 +112,9 @@ function itsetup {
         testrun-inttest-http.yml \
     )
 
+    echo "Uploading YAML definitions..."
     for i in ${yaml_files[@]}; do
-        cat $DIR/../docs/dsl/integration/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create
+        cat $DIR/../docs/dsl/integration/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create > /dev/null
     done
 }
 
@@ -166,7 +173,7 @@ startinfra
 if [ -n "$1" ]
 then
     echo "Performing 'docker build'..."
-    docker build -t toddproject/todd:$branch -f ../Dockerfile .. > /dev/null
+    docker build -t toddproject/todd:$branch -f ./Dockerfile . > /dev/null
 
     if [ $? != 0 ]
     then
