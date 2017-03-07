@@ -27,10 +27,7 @@ type KeyValueTask struct {
 
 // Run contains the logic necessary to perform this task on the agent. This particular task
 // will simply pass a key/value pair to the agent cache to be set
-func (kvt KeyValueTask) Run() error {
-
-	var ac = cache.NewAgentCache(kvt.Config)
-
+func (kvt KeyValueTask) Run(ac *cache.AgentCache) error {
 	err := ac.SetKeyValue(kvt.Key, kvt.Value)
 	if err != nil {
 		return fmt.Errorf("KeyValueTask failed - %s:%s", kvt.Key, kvt.Value)

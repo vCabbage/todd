@@ -53,7 +53,7 @@ func TestTaskRun(t *testing.T) {
 	}
 
 	// Run task
-	err := task.Run()
+	err := task.Run(nil)
 
 	if err != nil {
 		t.Fatalf("DownloadCollectors failed in some way and wasn't supposed to")
