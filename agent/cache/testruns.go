@@ -9,60 +9,31 @@
 package cache
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
-	"fmt"
 
 	log "github.com/Sirupsen/logrus"
-	_ "github.com/mattn/go-sqlite3" // This looks strange but is necessary - the sqlite package is used indirectly by database/sql
+	"github.com/pkg/errors"
 
 	"github.com/toddproject/todd/agent/defs"
 )
 
 // InsertTestRun places a new test run into the agent cache
-func (ac AgentCache) InsertTestRun(tr defs.TestRun) error {
-
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error accessing sqlite cache")
-	}
-	defer db.Close()
-
-	// Begin Insert
-	tx, err := db.Begin()
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error beginning new InsertTestRun action")
-	}
-	stmt, err := tx.Prepare("insert into testruns(uuid, testlet, args, targets) values(?, ?, ?, ?)")
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error preparing new InsertTestRun action")
-	}
-	defer stmt.Close()
-
+func (ac *AgentCache) InsertTestRun(tr defs.TestRun) error {
 	// Marshal our string slices to be stored in the database
 	jsonTargets, err := json.Marshal(tr.Targets)
 	if err != nil {
-		log.Error(err)
-		return errors.New("Error marshaling testrun data into JSON")
+		return errors.Wrap(err, "marshaling testrun targets into JSON")
 	}
 	jsonArgs, err := json.Marshal(tr.Args)
 	if err != nil {
-		log.Error(err)
-		return errors.New("Error marshaling testrun data into JSON")
+		return errors.Wrap(err, "marshaling testrun args into JSON")
 	}
 
-	_, err = stmt.Exec(tr.UUID, tr.Testlet, string(jsonArgs), string(jsonTargets))
+	_, err = ac.db.Exec("INSERT INTO testruns(uuid, testlet, args, targets) VALUES(?, ?, ?, ?)",
+		tr.UUID, tr.Testlet, string(jsonArgs), string(jsonTargets))
 	if err != nil {
-		log.Error(err)
-		return errors.New("Error executing new testrun insert")
+		return errors.Wrap(err, "executing new testrun insert")
 	}
-
-	tx.Commit()
 
 	log.Info("Inserted new testrun into agent cache - ", tr.UUID)
 
@@ -70,146 +41,74 @@ func (ac AgentCache) InsertTestRun(tr defs.TestRun) error {
 }
 
 // GetTestRun retrieves a testrun from the agent cache by its UUID
-func (ac AgentCache) GetTestRun(uuid string) (defs.TestRun, error) {
-
-	var tr defs.TestRun
-
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
+func (ac *AgentCache) GetTestRun(uuid string) (*defs.TestRun, error) {
+	rows, err := ac.db.Query("SELECT testlet, args, targets FROM testruns WHERE uuid = ?", uuid)
 	if err != nil {
-		log.Error(err)
-		return tr, errors.New("Error accessing sqlite cache")
+		return nil, errors.Wrap(err, "querying for selecting testrun")
 	}
-	defer db.Close()
-
-	rows, err := db.Query(fmt.Sprintf("select testlet, args, targets from testruns where uuid = \"%s\" ", uuid))
-	if err != nil {
-		log.Error(err)
-		return tr, errors.New("Error creating query for selecting testrun")
-	}
-
 	defer rows.Close()
+
+	tr := &defs.TestRun{UUID: uuid}
+	// TODO(mierdin): This may be unnecessary - rows.Scan() might allow you to pass this in as a byteslice. Experiment with this
+	var argsJSON, targetsJSON string
 	for rows.Next() {
+		err = rows.Scan(&tr.Testlet, &argsJSON, &targetsJSON)
+		if err != nil {
+			return tr, errors.Wrap(err, "scanning testrun data from database")
+		}
 
-		// TODO(mierdin): This may be unnecessary - rows.Scan() might allow you to pass this in as a byteslice. Experiment with this
-		var argsJSON, targetsJSON string
-
-		rows.Scan(&tr.Testlet, &argsJSON, &targetsJSON)
 		err = json.Unmarshal([]byte(argsJSON), &tr.Args)
 		if err != nil {
-			log.Error(err)
-			return tr, errors.New("Error unmarshaling testrun data from JSON")
+			return tr, errors.Wrap(err, "unmarshaling testrun args from JSON")
 		}
+
 		err = json.Unmarshal([]byte(targetsJSON), &tr.Targets)
 		if err != nil {
-			log.Error(err)
-			return tr, errors.New("Error unmarshaling testrun data from JSON")
+			return tr, errors.Wrap(err, "unmarshaling testrun targets from JSON")
 		}
 	}
 
-	tr.UUID = uuid
-
-	log.Info("Found testrun ", tr.UUID, " running testlet ", tr.Testlet)
+	log.Infof("Found testrun %q running testlet %q\n", tr.UUID, tr.Testlet)
 
 	return tr, nil
 }
 
 // UpdateTestRunData will update an existing testrun entry in the agent cache with the post-test
 // metrics dataset that corresponds to that testrun (by testrun UUID)
-func (ac AgentCache) UpdateTestRunData(uuid string, testData string) error {
-
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
+func (ac *AgentCache) UpdateTestRunData(uuid string, testData string) error {
+	_, err := ac.db.Exec("UPDATE testruns SET results = ? WHERE uuid = ?", testData, uuid)
 	if err != nil {
-		log.Error(err)
-		return errors.New("Error accessing sqlite cache for testrun update")
-	}
-	defer db.Close()
-
-	// Begin Update
-	tx, err := db.Begin()
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error beginning new UpdateTestRunData action")
+		return errors.Wrap(err, "updating testrun data")
 	}
 
-	stmt, err := tx.Prepare(fmt.Sprintf("update testruns set results = '%s' where uuid = '%s' ", testData, uuid))
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error preparing new UpdateTestRunData action")
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec()
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error executing new UpdateTestRunData action")
-	}
-	tx.Commit()
-
-	log.Infof("Inserted test data for %s into cache", uuid)
+	log.Infof("Inserted test data for %q into cache\n", uuid)
 
 	return nil
 }
 
 // DeleteTestRun will remove an entire testrun entry from teh agent cache by UUID
-func (ac AgentCache) DeleteTestRun(uuid string) error {
-
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
-	if err != nil {
-		log.Error(err)
-		return errors.New("Error accessing sqlite cache for DeleteTestRun")
-	}
-	defer db.Close()
-
-	// Begin Update
-	tx, err := db.Begin()
-	if err != nil {
-		log.Fatal(err)
-		return errors.New("Error beginning new DeleteTestRun action")
-	}
-
-	stmt, err := tx.Prepare(fmt.Sprintf("delete from testruns where uuid = \"%s\" ", uuid))
-	if err != nil {
-		log.Fatal(err)
-		return errors.New("Error preparing new DeleteTestRun action")
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec()
-	if err != nil {
-		log.Fatal(err)
-		return errors.New("Error executing new DeleteTestRun action")
-	}
-	tx.Commit()
-
-	return nil
+func (ac *AgentCache) DeleteTestRun(uuid string) error {
+	_, err := ac.db.Exec("DELETE FROM testruns WHERE uuid = ?", uuid)
+	return errors.Wrap(err, "deleting testrun")
 }
 
 // GetFinishedTestRuns returns a map of test UUIDS (keys) and the corresponding post-test metric data for those UUIDs (values)
 // The metric data is stored as a string containing JSON text, so this is what's placed into this map (meaning JSON parsing is
 // not performed in this function)
-func (ac AgentCache) GetFinishedTestRuns() (map[string]string, error) {
+func (ac *AgentCache) GetFinishedTestRuns() (map[string]string, error) {
+	rows, err := ac.db.Query(`SELECT uuid, results FROM testruns WHERE results != ""`)
+	if err != nil {
+		return nil, errors.Wrap(err, "selecting finished testruns")
+	}
+	defer rows.Close()
 
 	retmap := make(map[string]string)
-
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
-	if err != nil {
-		log.Error(err)
-		return retmap, errors.New("Error accessing sqlite cache for finished testruns")
-	}
-	defer db.Close()
-
-	rows, err := db.Query(fmt.Sprint("select uuid, results from testruns where results != \"\" "))
-	if err != nil {
-		log.Error(err)
-		return retmap, errors.New("Error creating query for selecting finished testruns")
-	}
-
-	defer rows.Close()
+	var uuid, testdata string
 	for rows.Next() {
-		var uuid, testdata string
-		rows.Scan(&uuid, &testdata)
+		err = rows.Scan(&uuid, &testdata)
+		if err != nil {
+			return nil, errors.Wrap(err, "scanning testrun data from database")
+		}
 		log.Debug("Found ripe testrun: ", uuid)
 		retmap[uuid] = testdata
 	}

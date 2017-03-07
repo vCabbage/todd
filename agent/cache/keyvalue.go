@@ -9,116 +9,77 @@
 package cache
 
 import (
-	"database/sql"
-	"fmt"
-
 	log "github.com/Sirupsen/logrus"
-	_ "github.com/mattn/go-sqlite3" // This look strange but is necessary - the sqlite package is used indirectly by database/sql
+	"github.com/pkg/errors"
 )
 
 // GetKeyValue will retrieve a value from the agent cache using a key string
-func (ac AgentCache) GetKeyValue(key string) string {
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	log.Debugf("Retrieving value of key - %s", key)
+func (ac *AgentCache) GetKeyValue(key string) (string, error) {
+	log.Debugf("Retrieving value of key - %s\n", key)
 
 	// First, see if the key exists.
-	rows, err := db.Query(fmt.Sprintf("select value from keyvalue where key = \"%s\" ", key))
+	rows, err := ac.db.Query("SELECT value FROM keyvalue WHERE key = ?", key)
 	if err != nil {
-		log.Fatal(err)
+		return "", errors.Wrap(err, "querying DB")
 	}
-	value := ""
 	defer rows.Close()
+
+	var value string
 	for rows.Next() {
-		rows.Scan(&value)
+		err = rows.Scan(&value)
+		if err != nil {
+			return "", errors.Wrap(err, "scanning values retrieved from DB")
+		}
 	}
-	return value
+	return value, nil
 }
 
 // SetKeyValue sets a KeyValue pair within the agent cache
-func (ac AgentCache) SetKeyValue(key, value string) error {
-
-	// Open connection
-	db, err := sql.Open("sqlite3", ac.dbLoc)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	log.Debugf("Writing keyvalue pair to agent cache - %s:%s", key, value)
+func (ac *AgentCache) SetKeyValue(key, value string) error {
+	log.Debugf("Writing keyvalue pair to agent cache - %s:%s\n", key, value)
 
 	// First, see if the key exists.
-	rows, err := db.Query(fmt.Sprintf("select key, value FROM keyvalue WHERE KEY = \"%s\";", key))
+	rows, err := ac.db.Query("SELECT count(1) FROM keyvalue WHERE KEY = ?", key)
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "querying count from DB")
 	}
-	rowcount := 0
 	defer rows.Close()
+
+	var rowCount int
 	for rows.Next() {
-		rowcount++
+		err = rows.Scan(&rowCount)
+		if err != nil {
+			return errors.Wrap(err, "scanning rowCount from DB")
+		}
 	}
 
-	if rowcount != 1 {
+	if rowCount != 1 {
+		tx, err := ac.db.Begin()
+		if err != nil {
+			return errors.Wrap(err, "starting DB transaction")
+		}
 
-		// If there is MORE than one row, we should delete the extras first
-		// TODO(mierdin): Is this really necessary?
-		if rowcount > 1 {
+		if rowCount > 1 {
+			// If there is MORE than one row, we should delete the extras first
+			// TODO(mierdin): Is this really necessary?
 			log.Warn("Extra keyvalue pair detected. Deleting and inserting new record.")
-			tx, err := db.Begin()
+
+			_, err = tx.Exec("DELETE FROM keyvalue WHERE KEY = ?", key)
 			if err != nil {
-				log.Fatal(err)
-			}
-			stmt, err := tx.Prepare(fmt.Sprintf("DELETE FROM keyvalue WHERE KEY = \"%s\";", key))
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer stmt.Close()
-			_, err = stmt.Exec()
-			if err != nil {
-				log.Fatal(err)
+				tx.Rollback()
+				return errors.Wrap(err, "deleteing keyvalues")
 			}
 		}
 
-		// Begin Insert
-		tx, err := db.Begin()
+		_, err = tx.Exec("INSERT INTO keyvalue(key, value) values(?, ?)", key, value)
 		if err != nil {
-			log.Fatal(err)
-		}
-		stmt, err := tx.Prepare("insert into keyvalue(key, value) values(?, ?)")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
-		_, err = stmt.Exec(key, value)
-		if err != nil {
-			log.Fatal(err)
-		}
-		tx.Commit()
-
-	} else {
-
-		// Begin Update
-		tx, err := db.Begin()
-		if err != nil {
-			log.Fatal(err)
+			tx.Rollback()
+			return errors.Wrap(err, "inserting keyvalue into DB")
 		}
 
-		stmt, err := tx.Prepare(fmt.Sprintf("update keyvalue set value = \"%s\" where key = \"%s\" ", value, key))
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
-		_, err = stmt.Exec()
-		if err != nil {
-			log.Fatal(err)
-		}
-		tx.Commit()
-
+		return errors.Wrap(tx.Commit(), "commmitting transaction")
 	}
-	return nil
+
+	_, err = ac.db.Exec("UPDATE keyvalue SET value = ? WHERE key = ?", value, key)
+	return errors.Wrap(err, "updating keyvalue")
 }

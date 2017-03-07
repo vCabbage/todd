@@ -15,6 +15,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/toddproject/todd/agent/cache"
 	"github.com/toddproject/todd/agent/defs"
 	"github.com/toddproject/todd/agent/responses"
 	"github.com/toddproject/todd/agent/tasks"
@@ -47,12 +48,16 @@ type Package interface {
 	SendTask(string, tasks.Task) error
 
 	// watches for new group membership instructions in the cache and reregisters
-	WatchForGroup()
+	WatchForGroup() error
 
 	ListenForGroupTasks(string, chan bool) error
 
 	ListenForResponses(*chan bool) error
 	SendResponse(responses.Response) error
+
+	// adds a cache agent to the comms package. temporary until
+	// comms package is refactored
+	setAgentCache(*cache.AgentCache)
 }
 
 // toddComms is a struct to hold anything that satisfies the CommsPackage interface
@@ -77,4 +82,15 @@ func NewToDDComms(cfg config.Config) (*toddComms, error) { // TODO: Return Packa
 
 	return &tc, nil
 
+}
+
+// NewAgentComms returns a comms instance configured for agent usages.
+//
+// TODO: accept an interface for cache instead of concrete type
+func NewAgentComms(cfg config.Config, ac *cache.AgentCache) (*toddComms, error) {
+	comms, err := NewToDDComms(cfg)
+	if err == nil {
+		comms.setAgentCache(ac)
+	}
+	return comms, err
 }

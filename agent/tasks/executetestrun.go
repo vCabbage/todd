@@ -36,7 +36,7 @@ type ExecuteTestRunTask struct {
 // Run contains the logic necessary to perform this task on the agent. This particular task will execute a
 // testrun that has already been installed into the local agent cache. In this context (single agent),
 // a testrun will be executed once per target, all in parallel.
-func (ett ExecuteTestRunTask) Run() error {
+func (ett ExecuteTestRunTask) Run(ac *cache.AgentCache) error {
 
 	// gatheredData represents test data from this agent for all targets.
 	// Key is target name, value is JSON output from testlet for that target
@@ -54,7 +54,6 @@ func (ett ExecuteTestRunTask) Run() error {
 	time.Sleep(3000 * time.Millisecond)
 
 	// Retrieve test from cache by UUID
-	var ac = cache.NewAgentCache(ett.Config)
 	tr, err := ac.GetTestRun(ett.TestUUID)
 	if err != nil {
 		log.Error(err)
