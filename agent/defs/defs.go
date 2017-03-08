@@ -13,18 +13,12 @@
 package defs
 
 import (
-	"bytes"
 	"encoding/json"
-	"sync"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
-
-type AgentRegistry struct {
-	Agents map[string]*AgentAdvert
-	Mu     sync.Mutex
-}
 
 // AgentAdvert is a struct for an Agent advertisement
 type AgentAdvert struct {
@@ -39,92 +33,45 @@ type AgentAdvert struct {
 
 // FactSummary produces a string containing a list of facts present in this agent advertisement.
 func (a AgentAdvert) FactSummary() string {
-
 	var keys []string
 
 	for k := range a.Facts {
 		keys = append(keys, k)
 	}
 
-	var buffer bytes.Buffer
-
-	for i := range keys {
-		buffer.WriteString(keys[i])
-
-		// Append a comma if there are more to write
-		if i != len(keys)-1 {
-			buffer.WriteString(", ")
-		}
-	}
-
-	return buffer.String()
+	return strings.Join(keys, ", ")
 }
 
 // CollectorSummary produces a string containing a list of available collectors
 // indicated by this agent advertisement.
 func (a AgentAdvert) CollectorSummary() string {
-
 	var keys []string
 
 	for k := range a.FactCollectors {
 		keys = append(keys, k)
 	}
 
-	var buffer bytes.Buffer
-
-	for i := range keys {
-		buffer.WriteString(keys[i])
-
-		// Append a comma if there are more to write
-		if i != len(keys)-1 {
-			buffer.WriteString(", ")
-		}
-	}
-
-	return buffer.String()
+	return strings.Join(keys, ", ")
 }
 
 // TestletSummary produces a string containing a list of available collectors
 // indicated by this agent advertisement.
 func (a AgentAdvert) TestletSummary() string {
-
 	var keys []string
 
 	for k := range a.Testlets {
 		keys = append(keys, k)
 	}
 
-	var buffer bytes.Buffer
-
-	for i := range keys {
-		buffer.WriteString(keys[i])
-
-		// Append a comma if there are more to write
-		if i != len(keys)-1 {
-			buffer.WriteString(", ")
-		}
-	}
-
-	return buffer.String()
+	return strings.Join(keys, ", ")
 }
 
 // PPFacts pretty-prints the facts for an agent
 func (a AgentAdvert) PPFacts() string {
-	retjson, err := json.MarshalIndent(a.Facts, "", "    ")
+	retJSON, err := json.MarshalIndent(a.Facts, "", "    ")
 	if err != nil {
 		log.Warn("Error Pretty-Printing Facts JSON")
 	}
 
-	return string(retjson)
+	return string(retJSON)
 }
-
-// Struct for a network interface on an agent
-// type AgentNic struct {
-//     Name      string   `json:"Name"`
-//     HwAddr    string   `json:"HwAddr"`
-//     IPv4Addrs []string `json:"IPv4Addrs"`
-//     IPv6Addrs []string `json:"IPv6Addrs"`
-
-//     //TODO(moswalt): Change to better datatypes
-//     //TODO(moswalt): Isolate mask to addtl property? Maybe filtering after the fact is okay
-// }
