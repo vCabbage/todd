@@ -94,18 +94,21 @@ func main() {
 	// Watch for changes to group membership
 	go tc.Package.WatchForGroup()
 
+	var defaultaddr string
+	if cfg.LocalResources.IPAddrOverride != "" {
+		defaultaddr = cfg.LocalResources.IPAddrOverride
+	} else {
+		defaultaddr, err = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
+		if err != nil {
+			log.Fatal("Unable to derive address from configured DefaultInterface: %v", err)
+		}
+	}
+
 	// Continually advertise agent status into message queue
 	for {
 
 		// Gather assets here as a map, and refer to a key in that map in the below struct
 		gatheredAssets := GetLocalAssets(cfg)
-
-		var defaultaddr string
-		if cfg.LocalResources.IPAddrOverride != "" {
-			defaultaddr = cfg.LocalResources.IPAddrOverride
-		} else {
-			defaultaddr = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
-		}
 
 		// Create an AgentAdvert instance to represent this particular agent
 		me := defs.AgentAdvert{

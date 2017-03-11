@@ -9,15 +9,16 @@
 package hostresources
 
 import (
+	"errors"
 	"net"
 )
 
 // GetIPOfInt will iterate over all addresses for the given network interface, but will return only
 // the first one it finds. TODO(mierdin): This has obvious drawbacks, particularly with IPv6. Need to figure out a better way.
-func GetIPOfInt(ifname string) net.IP {
+func GetIPOfInt(ifname string) (net.IP, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	for _, iface := range interfaces {
@@ -25,17 +26,17 @@ func GetIPOfInt(ifname string) net.IP {
 
 			addrs, err := iface.Addrs()
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			for _, addr := range addrs {
 				if ipnet, ok := addr.(*net.IPNet); ok {
 					if ipnet.IP.To4() != nil {
-						return ipnet.IP
+						return ipnet.IP, nil
 					}
 
 				}
 			}
 		}
 	}
-	return nil
+	return nil, errors.New("No DefaultInterface address found")
 }
