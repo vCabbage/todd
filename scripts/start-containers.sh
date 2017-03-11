@@ -14,7 +14,7 @@ branch=${branch##refs/heads/}
 branch=${branch:-HEAD}
 
 # Replace any slashes in branch with hyphen, so docker doesn't puke
-branch=${branch/\//-} 
+branch=${branch/\//_} 
 
 toddimage=toddproject/todd:$branch
 
