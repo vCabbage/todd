@@ -13,6 +13,9 @@ branch=$(git symbolic-ref -q HEAD)
 branch=${branch##refs/heads/}
 branch=${branch:-HEAD}
 
+# Replace any slashes in branch with hyphen, so docker doesn't puke
+branch=${branch/\//-} 
+
 toddimage=toddproject/todd:$branch
 
 if [ ${PWD:(-7)} == "scripts" ]
