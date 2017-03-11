@@ -98,7 +98,7 @@ func main() {
 	if cfg.LocalResources.IPAddrOverride != "" {
 		defaultaddr = cfg.LocalResources.IPAddrOverride
 	} else {
-		defaultaddr, err = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface).String()
+		defaultaddr, err = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface)
 		if err != nil {
 			log.Fatal("Unable to derive address from configured DefaultInterface: %v", err)
 		}

@@ -15,10 +15,10 @@ import (
 
 // GetIPOfInt will iterate over all addresses for the given network interface, but will return only
 // the first one it finds. TODO(mierdin): This has obvious drawbacks, particularly with IPv6. Need to figure out a better way.
-func GetIPOfInt(ifname string) (net.IP, error) {
+func GetIPOfInt(ifname string) (string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	for _, iface := range interfaces {
@@ -26,17 +26,17 @@ func GetIPOfInt(ifname string) (net.IP, error) {
 
 			addrs, err := iface.Addrs()
 			if err != nil {
-				return nil, err
+				return "", err
 			}
 			for _, addr := range addrs {
 				if ipnet, ok := addr.(*net.IPNet); ok {
 					if ipnet.IP.To4() != nil {
-						return ipnet.IP, nil
+						return ipnet.IP.To4().String(), nil
 					}
 
 				}
 			}
 		}
 	}
-	return nil, errors.New("No DefaultInterface address found")
+	return "", errors.New("No DefaultInterface address found")
 }
