@@ -70,12 +70,11 @@ function startinfra {
      -initial-cluster etcd0=http://${HostIP}:2380 \
      -initial-cluster-state new > /dev/null
 
-    # I have a rabbitmq server at home, but in case I'm working on my laptop only, spin this up too:
     echo "Starting RabbitMQ"
     docker run -d \
         --net todd-network \
         --name rabbit \
-        -p 8085:15672 \
+        -p 15672:15672 \
         -p 5672:5672 \
         -e RABBITMQ_DEFAULT_USER=guest \
         -e RABBITMQ_DEFAULT_PASS=guest \
@@ -85,7 +84,6 @@ function startinfra {
     docker run -d --net todd-network --volume=/var/influxdb:/data --name influx -p 8083:8083 -p 8086:8086 tutum/influxdb:0.9 > /dev/null
     echo "Starting Grafana"
     docker run -d --net todd-network --volume=/var/lib/grafana:/var/lib/grafana --name grafana -p 3000:3000 grafana/grafana > /dev/null
-
 }
 
 # arg $1: number of agents to use
