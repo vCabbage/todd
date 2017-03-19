@@ -10,6 +10,7 @@ ToDD Documentation
    :maxdepth: 1
 
    intro.rst
+   concepts.rst
    design.rst
    installconfig/install.rst
    dependencies/dependencies.rst
