@@ -9,14 +9,13 @@
 package facts
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 	"github.com/toddproject/todd/config"
 )
 
@@ -24,48 +23,53 @@ import (
 // It does so by iterating over the collectors installed on this agent's system,
 // executing them, and capturing their output. It will aggregate this output and
 // return it all as a single map (keys are fact names)
-func GetFacts(cfg config.Config) map[string][]string {
+func GetFacts(cfg config.Config) (map[string][]string, error) {
+	var scripts []string
+	// Find all collector scripts
+	dir := filepath.Join(cfg.LocalResources.OptDir, "assets", "factcollectors")
+	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if err != nil {
+			log.Warnf("Error gathering facts: %v (%s)", err, path)
+			return nil // skip but continue walking
+		}
+		if !f.IsDir() {
+			scripts = append(scripts, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "finding fact collectors")
+	}
 
 	retFactSet := make(map[string][]string)
 
-	// this is the function that will do work on a single file during a walk
-	executeCollector := func(path string, f os.FileInfo, err error) error {
-		if !f.IsDir() {
-			cmd := exec.Command(path)
-
-			// Stdout buffer
-			cmdOutput := &bytes.Buffer{}
-			// Attach buffer to command
-			cmd.Stdout = cmdOutput
-			// Execute collector
-			cmd.Run()
-
-			// We only care that the key is a string (this is the fact name)
-			// The value for this key can be whatever
-			fact := make(map[string][]string)
-
-			// Unmarshal JSON into our fact map
-			err = json.Unmarshal(cmdOutput.Bytes(), &fact)
-			if err != nil {
-				return err
-			}
-
-			// We only expect a single key in the returned fact map. Only add to fact map if this is true.
-			if len(fact) == 1 {
-				for factName, factValue := range fact {
-					retFactSet[factName] = factValue
-					log.Debugf("Results from collector '%s': %s", factName, factValue)
-				}
-			}
+	// Execute collector scripts
+	for _, script := range scripts {
+		out, err := exec.Command(script).Output()
+		if err != nil {
+			return nil, errors.Wrapf(err, "executing %q", script)
 		}
-		return nil
+
+		// We only care that the key is a string (this is the fact name)
+		// The value for this key can be whatever
+		fact := make(map[string][]string)
+
+		// Unmarshal JSON into our fact map
+		err = json.Unmarshal(out, &fact)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing %q output", script)
+		}
+
+		// We only expect a single key in the returned fact map. Only add to fact map if this is true.
+		if len(fact) != 1 {
+			continue
+		}
+
+		for factName, factValue := range fact {
+			retFactSet[factName] = factValue
+			log.Debugf("Results from collector '%s': %s", factName, factValue)
+		}
 	}
 
-	// Perform above Walk function (execute_collector) on the collector directory
-	err := filepath.Walk(fmt.Sprintf("%s/assets/factcollectors", cfg.LocalResources.OptDir), executeCollector)
-	if err != nil {
-		log.Error("Problem running fact-gathering collector")
-	}
-
-	return retFactSet
+	return retFactSet, nil
 }
