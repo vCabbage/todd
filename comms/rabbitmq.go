@@ -206,8 +206,8 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 		defaultaddr, err = hostresources.GetIPOfInt(rmq.config.LocalResources.DefaultInterface)
 		if err != nil {
 			log.Error("Unable to derive address from configured DefaultInterface: %v", err)
+			return err
 		}
-		return err
 	}
 
 	msgs, err := ch.Consume(
@@ -259,7 +259,6 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 
 						// hashes do not match, so we need to append the asset download URL to the remediate list
 						assetURL := fmt.Sprintf("http://%s:%s/%s/%s", defaultaddr, rmq.config.Assets.Port, assetType, name)
-
 						assetList = append(assetList, assetURL)
 
 					}
