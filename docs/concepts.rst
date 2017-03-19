@@ -41,9 +41,48 @@ agents is a simple matter of spinning up additional agents that belong to that s
 
 .. NOTE::
 
-   See the "Groups" section of the `Objects Documentation <using/objects.html>`_  for more info on
+   See the "Group" section of the `Objects Documentation <using/objects.html>`_  for more info on
    what parameters can be used to assign agents to groups.
 
 So, at this point, you can probably think of groups best as a scaling mechanism. ToDD assumes you have
 other tools, such as Kubernetes, for automating this, and tries only to allow you to describe how that
 might look so that ToDD can automatically use resources you've provided for it.
+
+
+Testruns
+--------
+
+**The "testrun" is the most atomic unit of testing in ToDD**. It is the abstraction upon which all other forms
+of test automation is built.
+
+In the previous section, we discussed how testing is done using ToDD Groups, and not with discrete agents.
+The testrun is where this idea manifests itself, as testruns are a logical point-to-point concept. They're
+always taking place either between a group of ToDD agents and a group of "dumb" endpoints, or between
+two ToDD groups. While it's true that there may be (and probably should be) many actual, addressable endpoints
+taking place in a test, the testrun is still describing a point-to-point relationship.
+
+The testrun configuration is designed to answer three questions:
+
+* What are the two ends of the test?
+* What application am I testing with?
+* What kind of parameters does this test need to be successful?
+
+.. NOTE::
+
+   See the "Testrun" section of the `Objects Documentation <using/objects.html>`_  for more information on the
+   specific syntax used to describe a testrun.
+
+Again, the Testrun is the most atomic unit of testing in ToDD. As a result, there are a few things that a testrun
+does **not** do:
+
+* **Testing beyond more than two endpoints** - testruns are group to group only
+* **Aggregate metrics** - all metrics are reported individually, per-agent.
+* **Automatically run themselves** - testruns are either started manually via the CLI, or programmatically.
+
+Testruns intentionally do not do these things because they're leaving room for future, higher-level abstractions to do them.
+
+.. NOTE::
+
+    The concepts that will be involved with doing these things are still a work-in-progress, and feedback on how these
+    things should be done is welcome. In the meantime, ToDD tries to be as open as possible, so that you can solve
+    these things for yourself until they're done in ToDD.
