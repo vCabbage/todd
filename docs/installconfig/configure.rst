@@ -34,13 +34,13 @@ The server configuration file (usually ``/etc/todd/server.cfg``) contains config
 
     # Parameters for database connectivity
     [DB]
-    IP = 192.168.0.10                  # Hostname or IP address for database
+    Host = 192.168.0.10                  # Hostname or IP address for database
     Port = 4001                        # Port for database
     Plugin = etcd                      # Database plugin to use (i.e. "etcd")
 
     # Parameters for time-series database connectivity
     [TSDB]
-    IP = 192.168.0.10                  # Hostname or IP address for tsdb
+    Host = 192.168.0.10                  # Hostname or IP address for tsdb
     Port = 8086                        # Port for tsdb
     Plugin = influxdb                  # TSDB plugin to use (i.e. "influxdb")
 
