@@ -519,18 +519,15 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				err = json.Unmarshal(d.Body, &itrTask)
 				// TODO(mierdin): Need to handle this error
 
-				var response responses.SetAgentStatusResponse
-				response.Type = "AgentStatus" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
-				response.AgentUUID = uuid
-				response.TestUUID = itrTask.Tr.UUID
-
+				status := "ready"
 				err = itrTask.Run(rmq.ac)
 				if err != nil {
 					log.Warning("The InstallTestRun task failed to initialize")
-					response.Status = "fail"
-				} else {
-					response.Status = "ready"
+					status = "fail"
 				}
+
+				response := responses.NewSetAgentStatus(uuid, itrTask.Tr.UUID, status)
+
 				rmq.SendResponse(response)
 
 			case "ExecuteTestRun":
@@ -550,12 +547,7 @@ func (rmq rabbitMQComms) ListenForTasks(uuid string) error {
 				// TODO(mierdin): Need to handle this error
 
 				// Send status that the testing has begun, right now.
-				response := responses.SetAgentStatusResponse{
-					TestUUID: etrTask.TestUUID,
-					Status:   "testing",
-				}
-				response.AgentUUID = uuid     // TODO(mierdin): Can't declare this in the literal, it's that embedding behavior again. Need to figure this out.
-				response.Type = "AgentStatus" //TODO(mierdin): This is an extra step. Maybe a factory function for the task could help here?
+				response := responses.NewSetAgentStatus(uuid, etrTask.TestUUID, "testing")
 				rmq.SendResponse(response)
 
 				err = etrTask.Run(rmq.ac)
@@ -864,7 +856,7 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 		for d := range msgs {
 
 			// Unmarshal into BaseResponse to determine type
-			var baseMsg responses.BaseResponse
+			var baseMsg responses.Base
 			err = json.Unmarshal(d.Body, &baseMsg)
 			if err != nil {
 				log.Error("Problem unmarshalling baseresponse")
@@ -874,9 +866,9 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 
 			// call agent response method based on type
 			switch baseMsg.Type {
-			case "AgentStatus":
+			case responses.TypeSetAgentStatus:
 
-				var sasr responses.SetAgentStatusResponse
+				var sasr responses.SetAgentStatus
 				err = json.Unmarshal(d.Body, &sasr)
 				if err != nil {
 					log.Error("Problem unmarshalling AgentStatus")
@@ -888,9 +880,9 @@ func (rmq rabbitMQComms) ListenForResponses(stopListeningForResponses *chan bool
 					log.Errorf("Error writing agent status to DB: %v", err)
 				}
 
-			case "TestData":
+			case responses.TypeUploadTestData:
 
-				var utdr responses.UploadTestDataResponse
+				var utdr responses.UploadTestData
 				err = json.Unmarshal(d.Body, &utdr)
 				if err != nil {
 					log.Error("Problem unmarshalling UploadTestDataResponse")
