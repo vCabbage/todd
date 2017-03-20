@@ -24,7 +24,7 @@ func GetDefaultInterfaceIP(ifname, ipAddrOverride string) (string, error) {
 	if ipAddrOverride != "" {
 		return ipAddrOverride, nil
 	}
-	return getIPOfint(ifname)
+	return getIPOfInt(ifname)
 }
 
 // getIPOfInt will iterate over all addresses for the given network interface, but will return only
