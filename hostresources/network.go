@@ -21,18 +21,10 @@ import (
 // The agents use this address so that the server knows how to orchestrate tests.
 // (i.e. This agent publishes it's default address, and the server instructs other agents to target it in tests)
 func GetDefaultInterfaceIP(ifname, ipAddrOverride string) (string, error) {
-
 	if ipAddrOverride != "" {
 		return ipAddrOverride, nil
 	}
-
-	defaultaddr, err := getIPOfInt(ifname)
-	if err != nil {
-		return "", err
-	} else {
-		return defaultaddr, nil
-	}
-
+	return getIPOfint(ifname)
 }
 
 // getIPOfInt will iterate over all addresses for the given network interface, but will return only
