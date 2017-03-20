@@ -13,9 +13,24 @@ import (
 	"net"
 )
 
-// GetIPOfInt will iterate over all addresses for the given network interface, but will return only
+func GetDefaultInterfaceIP(ifname, ipAddrOverride string) (string, error) {
+
+	if ipAddrOverride != "" {
+		return ipAddrOverride, nil
+	}
+
+	defaultaddr, err := getIPOfInt(ifname)
+	if err != nil {
+		return "", err
+	} else {
+		return defaultaddr, nil
+	}
+
+}
+
+// getIPOfInt will iterate over all addresses for the given network interface, but will return only
 // the first one it finds. TODO(mierdin): This has obvious drawbacks, particularly with IPv6. Need to figure out a better way.
-func GetIPOfInt(ifname string) (string, error) {
+func getIPOfInt(ifname string) (string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return "", err

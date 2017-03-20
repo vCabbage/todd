@@ -82,14 +82,11 @@ func main() {
 		log.Fatalf("Problem connecting to comms: %v\n", err)
 	}
 
-	var defaultaddr string
-	if cfg.LocalResources.IPAddrOverride != "" {
-		defaultaddr = cfg.LocalResources.IPAddrOverride
-	} else {
-		defaultaddr, err = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface)
-		if err != nil {
-			log.Fatalf("Unable to derive address from configured DefaultInterface: %v", err)
-		}
+	// Get default IP address for the server.
+	// This address is primarily used to inform the agents of the URL they should use to download assets
+	defaultaddr, err := hostresources.GetDefaultInterfaceIP(cfg.LocalResources.DefaultInterface, cfg.LocalResources.IPAddrOverride)
+	if err != nil {
+		log.Fatalf("Unable to derive address from configured DefaultInterface: %v", err)
 	}
 
 	assetURLPrefix := fmt.Sprintf("http://%s:%s", defaultaddr, cfg.Assets.Port)

@@ -94,14 +94,12 @@ func main() {
 	// Watch for changes to group membership
 	go tc.Package.WatchForGroup()
 
-	var defaultaddr string
-	if cfg.LocalResources.IPAddrOverride != "" {
-		defaultaddr = cfg.LocalResources.IPAddrOverride
-	} else {
-		defaultaddr, err = hostresources.GetIPOfInt(cfg.LocalResources.DefaultInterface)
-		if err != nil {
-			log.Fatal("Unable to derive address from configured DefaultInterface: %v", err)
-		}
+	// Get default IP address for the server.
+	// This address is primarily used so that the server knows how to orchestrate tests.
+	// (i.e. This agent publishes it's default address, and the server instructs other agents to target it in tests)
+	defaultaddr, err := hostresources.GetDefaultInterfaceIP(cfg.LocalResources.DefaultInterface, cfg.LocalResources.IPAddrOverride)
+	if err != nil {
+		log.Fatalf("Unable to derive address from configured DefaultInterface: %v", err)
 	}
 
 	// Continually advertise agent status into message queue
