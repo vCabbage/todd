@@ -38,8 +38,8 @@ type Package interface {
 	// (agent advertisement to advertise)
 	AdvertiseAgent(defs.AgentAdvert) error
 
-	// (map of assets:hashes, lock for asset map)
-	ListenForAgent(assetProvider) error
+	// (map of assets:hashes, base asset URL)
+	ListenForAgent(assetProvider, string) error
 
 	// (uuid)
 	ListenForTasks(string) error

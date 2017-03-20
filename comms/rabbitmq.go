@@ -24,7 +24,6 @@ import (
 	"github.com/toddproject/todd/agent/tasks"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/db"
-	"github.com/toddproject/todd/hostresources"
 )
 
 const (
@@ -165,7 +164,7 @@ func (rmq rabbitMQComms) AdvertiseAgent(me defs.AgentAdvert) error {
 
 // ListenForAgent will listen on the message queue for new agent advertisements.
 // It is meant to be run as a goroutine
-func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
+func (rmq rabbitMQComms) ListenForAgent(assets assetProvider, assetURLPrefix string) error {
 
 	// TODO(mierdin): does func param need to be a pointer?
 
@@ -247,14 +246,7 @@ func (rmq rabbitMQComms) ListenForAgent(assets assetProvider) error {
 					if agentAssets[name] != hash {
 
 						// hashes do not match, so we need to append the asset download URL to the remediate list
-						var defaultIP string
-						if rmq.config.LocalResources.IPAddrOverride != "" { // TODO: set defaultIP to override byte default and check if empty
-							defaultIP = rmq.config.LocalResources.IPAddrOverride
-						} else {
-							defaultIP = hostresources.GetIPOfInt(rmq.config.LocalResources.DefaultInterface).String()
-						}
-						assetURL := fmt.Sprintf("http://%s:%s/%s/%s", defaultIP, rmq.config.Assets.Port, assetType, name)
-
+						assetURL := fmt.Sprintf("%s/%s/%s", assetURLPrefix, assetType, name)
 						assetList = append(assetList, assetURL)
 
 					}

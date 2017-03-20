@@ -20,6 +20,7 @@ import (
 	"github.com/toddproject/todd/comms"
 	"github.com/toddproject/todd/config"
 	"github.com/toddproject/todd/db"
+	"github.com/toddproject/todd/hostresources"
 	"github.com/toddproject/todd/server/grouping"
 )
 
@@ -81,9 +82,18 @@ func main() {
 		log.Fatalf("Problem connecting to comms: %v\n", err)
 	}
 
+	// Get default IP address for the server.
+	// This address is primarily used to inform the agents of the URL they should use to download assets
+	defaultaddr, err := hostresources.GetDefaultInterfaceIP(cfg.LocalResources.DefaultInterface, cfg.LocalResources.IPAddrOverride)
+	if err != nil {
+		log.Fatalf("Unable to derive address from configured DefaultInterface: %v", err)
+	}
+
+	assetURLPrefix := fmt.Sprintf("http://%s:%s", defaultaddr, cfg.Assets.Port)
+
 	go func() {
 		for {
-			err := tc.Package.ListenForAgent(assets)
+			err := tc.Package.ListenForAgent(assets, assetURLPrefix)
 			if err != nil {
 				log.Fatalf("Error listening for ToDD Agents")
 			}
