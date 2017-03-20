@@ -13,6 +13,13 @@ import (
 	"net"
 )
 
+// GetDefaultInterfaceIP determines the appropriate IP address to use for either the server or agent
+// based on configuration parameters passed in as arguments
+//
+// The server uses this address to inform the agents of the URL they should use to download assets
+//
+// The agents use this address so that the server knows how to orchestrate tests.
+// (i.e. This agent publishes it's default address, and the server instructs other agents to target it in tests)
 func GetDefaultInterfaceIP(ifname, ipAddrOverride string) (string, error) {
 
 	if ipAddrOverride != "" {
