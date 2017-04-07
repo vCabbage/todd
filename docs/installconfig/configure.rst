@@ -1,15 +1,24 @@
 Configuring ToDD
 ================================
 
-ToDD uses configuration files (typically found in ``/etc/todd``) to control it's behavior. The server and the agent use their own individual config files, and sample files are shown below.
+ToDD uses configuration files (typically found in ``/etc/todd``) to control its behavior. The server and the agent use their own individual configuration files (examples of each are shown below).
 
 .. NOTE:: 
+
    Configuration files for both ``todd-server`` and ``todd-agent`` binaries load once at initial start. So, in order to apply any changes to the configuration, these processes need to be restarted.
 
 Server Configuration
 --------------------
 
-The server configuration file (usually ``/etc/todd/server.cfg``) contains configurations for all services that the server will require - things like integrated databases, communications plugins, and internal calculations. Here is a sample server configuration file, with comments inline:
+The server configuration file (usually ``/etc/todd/server.cfg``) contains configurations for all services that the server will require - things like integrated databases, communications plugins, and internal calculations.
+
+.. WARNING:: 
+
+   Pay particular note to the ``LocalResources`` section of the configuration. The ``DefaultInterface`` option is required (or in lieu thereof, the ``IPAddrOverride`` option) so that the server will know what IP address to serve assets from to the agents. The server will not start if it cannot determine its IP address using these options.
+
+   If this is configured incorrectly, agents will be unable to retrieve the required asset files, and will fail to register with the server.
+
+Here is a sample server configuration file, with comments inline:
 
 .. code-block:: text
 
@@ -67,7 +76,14 @@ The server configuration file (usually ``/etc/todd/server.cfg``) contains config
 Agent Configuration
 -------------------
 
-The agent configuration (usually ``/etc/todd/agent.cfg``) is considerably simpler than the server configuration. Again, comments are provided below to help illustrate the various options:
+The agent configuration (usually ``/etc/todd/agent.cfg``) is considerably simpler than the server configuration.
+
+.. WARNING:: 
+
+   Similar to the server configuration, the ``LocalResources`` section is very important. The ``DefaultInterface`` option is required (or in lieu thereof, the ``IPAddrOverride`` option) so that the agent can report a usable address back to the server in order for it to facilitate tests. Like the ToDD server,
+   the agent will not start if it cannot determine its IP address.
+
+Again, comments are provided below to help illustrate the various options:
 
 .. code-block:: text
 
