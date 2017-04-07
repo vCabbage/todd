@@ -1,7 +1,7 @@
 Configuring ToDD
 ================================
 
-ToDD uses configuration files (typically found in ``/etc/todd``) to control it's behavior. The server and the agent use their own individual config files, and sample files are shown below.
+ToDD uses configuration files (typically found in ``/etc/todd``) to control its behavior. The server and the agent use their own individual configuration files (examples of each are shown below).
 
 .. NOTE:: 
 
@@ -14,9 +14,9 @@ The server configuration file (usually ``/etc/todd/server.cfg``) contains config
 
 .. WARNING:: 
 
-   Pay particular note to he LocalResources section of the configuration. The DefaultInterface option is required (or in lieu thereof, the IPAddrOverride option) so that the server will know what IP address to serve assets from to the agents. The server will not successfully start if an address is not determined.
+   Pay particular note to the ``LocalResources`` section of the configuration. The ``DefaultInterface`` option is required (or in lieu thereof, the ``IPAddrOverride`` option) so that the server will know what IP address to serve assets from to the agents. The server will not start if it cannot determine its IP address using these options.
 
-   If this is configured, but incorrectly, agents may not retrieve the required asset files and will therefore fail to register with the server. 
+   If this is configured incorrectly, agents will be unable to retrieve the required asset files, and will fail to register with the server.
 
 Here is a sample server configuration file, with comments inline:
 
@@ -80,7 +80,8 @@ The agent configuration (usually ``/etc/todd/agent.cfg``) is considerably simple
 
 .. WARNING:: 
 
-   Similar to the server configuration, the LocalResources section is very important. The DefaultInterface option is required (or in lieu thereof, the IPAddrOverride option) so that the agent can report a usable address back to the server in order for it to facilitate tests.
+   Similar to the server configuration, the ``LocalResources`` section is very important. The ``DefaultInterface`` option is required (or in lieu thereof, the ``IPAddrOverride`` option) so that the agent can report a usable address back to the server in order for it to facilitate tests. Like the ToDD server,
+   the agent will not start if it cannot determine its IP address.
 
 Again, comments are provided below to help illustrate the various options:
 
