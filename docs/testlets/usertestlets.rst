@@ -20,24 +20,24 @@ Provided it has a unique name, and that it is executable (pre-compiled binary, P
 .. NOTE::
     All native testlets maintain their own documentation. Please view the links at the top of `Native Testlets <nativetestlets/nativetestlets.html>`_ for more information about these testlets, such as what arguments they require, and a sample of their output.
 
-
 Check Mode
 ----------
+
 Each testlet must support a "check mode". This is sort of a "pre-test" check to ensure the testlet can be run. When running in "check mode", a testlet should test it's own ability to run a "real" test, such as sending traffic to localhost to ensure it can use the network stack.
 
-For instance, when the ToDD agent runs the "ping" testlet in check mode, it would invoke it like this:
+For instance, when the ToDD agent runs the "todd-ping" testlet in check mode, it would invoke it like this:
 
 .. code-block:: text
 
-    ping check
+    todd-ping check
 
-That said, the ToDD Server will distribute testrun instructions to the agents in two phases:
+When invoked like this, any testlet should go through whatever internal checks it needs to in order to verify it can operate successfully. This means testing access to sockets, filesystem resources, etc.
 
-* Install - run the referenced testlet in check mode, then record all of the parameters for the intended test in the agent's cache
-* Execute - run the installed testrun instruction
+When finished, and everything checks out successfully, the testlet should print the following string to stdout: "Check mode PASSED". The agent will be watching stdout for this string and will use this to know if the testlet is ready to be used.
 
 Input
 -----
+
 Obviously, testing application vary greatly in terms of their input. Some testing applications use certain command-line arguments or flags, and others aren't even configured via the command-line.
 
 The idea of a ToDD testlet is to standardize this input so that any testing application can be run identically. This was a very useful concept early in ToDD's life, as the very first testlets were simple bash scripts that wrapped existing applications like ``ping`` and ``iperf``, and passed around the required arguments to make them conform to the standard we'll discuss now.

@@ -87,3 +87,9 @@ Testruns intentionally do not do these things because they're leaving room for f
     The concepts that will be involved with doing these things are still a work-in-progress, and feedback on how these
     things should be done is welcome. In the meantime, ToDD tries to be as open as possible, so that you can solve
     these things for yourself until they're done in ToDD.
+
+The ToDD Server will distribute testrun instructions to the agents in two phases:
+
+* Install - run the referenced testlet in `check mode <testlets/usertestlets.html>`_ , then record all of the parameters for the intended test in the agent's cache
+* Execute - run the installed testrun instruction
+
