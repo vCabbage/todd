@@ -111,7 +111,6 @@ func main() {
 		fcts, err := facts.GetFacts(cfg)
 		if err != nil {
 			log.Errorf("Error gathering facts: %v", err)
-			continue
 		}
 
 		// Create an AgentAdvert instance to represent this particular agent
