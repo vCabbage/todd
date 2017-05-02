@@ -222,7 +222,7 @@ func (etcddb *etcdDB) GetObjects(objType string) ([]objects.ToddObject, error) {
 
 	// Iterate over found objects
 	for _, node := range resp.Node.Nodes {
-		log.Printf("Parsing object %s \n", node.Value)
+		log.Printf("Retrieving object from etcd: %s \n", node.Value)
 
 		// Marshal API data into ToddObject
 		var baseobj objects.BaseObject
