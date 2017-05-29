@@ -4,4 +4,4 @@ label: datacenter
 spec:
     group: datacenter
     matches:
-    - within_subnet: "172.18.0.0/16"
+    - hostname: "todd-agent-[3-5]"

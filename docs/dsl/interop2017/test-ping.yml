@@ -5,7 +5,7 @@ label: test-ping
 spec:
     targettype: uncontrolled
     source:
-        name: rpi
+        name: headquarters
         app: ping
         args: "-c 10"
     target:

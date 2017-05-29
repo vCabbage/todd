@@ -9,6 +9,6 @@ spec:
         app: iperf
         args: "-c {{ target }}"
     target:
-        name: rpi
+        name: headquarters
         app: iperf
         args: "-s"

@@ -5,7 +5,7 @@ label: test-http
 spec:
     targettype: uncontrolled
     source:
-        name: rpi
+        name: headquarters
         app: http
         args: ""
     target:
