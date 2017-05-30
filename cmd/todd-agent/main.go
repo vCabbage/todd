@@ -105,12 +105,15 @@ func main() {
 	// Continually advertise agent status into message queue
 	for {
 
+		time.Sleep(10 * time.Second) // TODO(moswalt): make configurable
+
 		// Gather assets here as a map, and refer to a key in that map in the below struct
 		gatheredAssets := GetLocalAssets(cfg)
 
 		fcts, err := facts.GetFacts(cfg)
 		if err != nil {
 			log.Errorf("Error gathering facts: %v", err)
+			continue
 		}
 
 		// Create an AgentAdvert instance to represent this particular agent
@@ -128,8 +131,6 @@ func main() {
 		if err != nil {
 			log.Error("Failed to advertise agent after several retries")
 		}
-
-		time.Sleep(10 * time.Second) // TODO(moswalt): make configurable
 	}
 
 }
