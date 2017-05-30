@@ -12,9 +12,6 @@ RUN mkdir -p /opt/todd/server/assets/factcollectors
 RUN mkdir -p /opt/todd/agent/assets/testlets
 RUN mkdir -p /opt/todd/server/assets/testlets
 
-RUN apt-get update \
- && apt-get install -y vim curl iperf git sqlite3
-
 # Install ToDD
 COPY . /go/src/github.com/toddproject/todd
 
@@ -30,6 +27,10 @@ RUN mkdir /etc/todd && \
     mkdir -p /opt/todd/agent/assets/testlets && \
     mkdir -p /opt/todd/server/assets/factcollectors && \
     mkdir -p /opt/todd/server/assets/testlets
+
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends curl iperf && \
+    apt-get -y clean
 
 COPY --from=build /go/bin/todd* /usr/local/bin/
 
