@@ -23,6 +23,8 @@ import (
 // TODO(mierdin): This unit test works, but you need other tests to test for problems
 // with the i/o system, filesystem, or http call. (rainy day testing)
 
+// TODO: write a test that removes the "factcollectors" and tests for an error
+
 func TestTaskRun(t *testing.T) {
 	responseData := []byte("responsetext")
 	// Test server that always responds with 200 code, and specific payload
@@ -48,7 +50,7 @@ func TestTaskRun(t *testing.T) {
 	assets := []string{
 		server.URL + "/factcollectors/test_collector_1",
 		server.URL + "/factcollectors/test_collector_2",
-		server.URL + "/factcollectors/test_collector_3", // write a test that removes the "factcollectors" and tests for an error
+		server.URL + "/factcollectors/test_collector_3",
 	}
 
 	// setup task object
@@ -84,7 +86,7 @@ func TestTaskRun(t *testing.T) {
 		}
 
 		if !bytes.Equal(data, responseData) {
-			t.Errorf("wanted %q to containe %q, but it was %q", path, string(responseData), string(data))
+			t.Errorf("wanted %q to contains %q, but it was %q", path, string(responseData), string(data))
 		}
 	}
 }
