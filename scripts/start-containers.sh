@@ -184,8 +184,7 @@ then
 fi
 
 # If first argument is "integration", start that topology and run tests
-if [ "$1" == "integration" ]
-then
+if [ "$1" == "integration" ]; then
     sleep 10
 
     starttodd 6 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
@@ -194,6 +193,10 @@ then
 
     runintegrationtests
     exit $?
+elif [ "$1" == "demo" ]; then
+
+    starttodd 6 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
+
 else
     # If the first argument isn't "integration", then it's probably number of agents, followed by configs.
     # This can be used to perform load testing in Docker, for instance by using the same configurations as
