@@ -1,7 +1,0 @@
----
-type: group
-label: datacenter
-spec:
-    group: datacenter
-    matches:
-    - hostname: "todd-agent-[3-5]"

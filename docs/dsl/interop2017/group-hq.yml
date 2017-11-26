@@ -1,7 +1,0 @@
----
-type: group
-label: headquarters
-spec:
-    group: headquarters
-    matches:
-    - hostname: "todd-agent-[0-2]"

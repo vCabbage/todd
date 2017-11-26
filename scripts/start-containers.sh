@@ -106,22 +106,20 @@ function starttodd {
 function itsetup {
 
     yaml_files=( \
-        group-inttest-red.yml \
-        group-inttest-blue.yml \
-        testrun-inttest-iperf.yml \
-        testrun-inttest-ping.yml \
-        testrun-inttest-http.yml \
+        group-red.yml \
+        group-blue.yml \
+        test-iperf.yml \
+        test-ping.yml \
+        test-http.yml \
     )
 
     echo "Uploading YAML definitions..."
     for i in ${yaml_files[@]}; do
-        cat $DIR/../docs/dsl/integration/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create > /dev/null
+        cat $DIR/../scripts/artifacts/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create > /dev/null
     done
 }
 
 function runintegrationtests {
-
-    # set -e
 
     sleep 20
 
@@ -133,13 +131,13 @@ function runintegrationtests {
 
     dtodd groups
 
-    dtodd run inttest-ping -y -j
+    dtodd run test-ping -y -j
 
-    dtodd run inttest-http -y -j
+    dtodd run test-http -y -j
 
     # Running the iperf test twice to ensure the server side is properly cleaned up
-    dtodd run inttest-iperf -y -j
-    dtodd run inttest-iperf -y -j
+    dtodd run test-iperf -y -j
+    dtodd run test-iperf -y -j
 
 
 

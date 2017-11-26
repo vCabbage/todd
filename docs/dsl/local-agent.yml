@@ -1,8 +1,0 @@
----
-# Example grouping file
-type: group
-label: local-agent
-spec:
-    group: local-agent
-    matches:
-    - hostname: "uraj" # This is actually a regular expression, but we're just matching on the exact hostname in this example
