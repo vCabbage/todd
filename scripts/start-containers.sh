@@ -106,22 +106,20 @@ function starttodd {
 function itsetup {
 
     yaml_files=( \
-        group-inttest-red.yml \
-        group-inttest-blue.yml \
-        testrun-inttest-iperf.yml \
-        testrun-inttest-ping.yml \
-        testrun-inttest-http.yml \
+        group-red.yml \
+        group-blue.yml \
+        test-iperf.yml \
+        test-ping.yml \
+        test-http.yml \
     )
 
     echo "Uploading YAML definitions..."
     for i in ${yaml_files[@]}; do
-        cat $DIR/../docs/dsl/integration/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create > /dev/null
+        cat $DIR/../scripts/artifacts/${i} | docker run -i --rm --net todd-network --name="todd-client" $toddimage todd --host="todd-server.todd-network" create > /dev/null
     done
 }
 
 function runintegrationtests {
-
-    # set -e
 
     sleep 20
 
@@ -133,13 +131,13 @@ function runintegrationtests {
 
     dtodd groups
 
-    dtodd run inttest-ping -y -j
+    dtodd run test-ping -y -j
 
-    dtodd run inttest-http -y -j
+    dtodd run test-http -y -j
 
     # Running the iperf test twice to ensure the server side is properly cleaned up
-    dtodd run inttest-iperf -y -j
-    dtodd run inttest-iperf -y -j
+    dtodd run test-iperf -y -j
+    dtodd run test-iperf -y -j
 
 
 
@@ -184,8 +182,7 @@ then
 fi
 
 # If first argument is "integration", start that topology and run tests
-if [ "$1" == "integration" ]
-then
+if [ "$1" == "integration" ]; then
     sleep 10
 
     starttodd 6 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
@@ -194,6 +191,10 @@ then
 
     runintegrationtests
     exit $?
+elif [ "$1" == "demo" ]; then
+
+    starttodd 6 /etc/todd/server-int.cfg /etc/todd/agent-int.cfg
+
 else
     # If the first argument isn't "integration", then it's probably number of agents, followed by configs.
     # This can be used to perform load testing in Docker, for instance by using the same configurations as
