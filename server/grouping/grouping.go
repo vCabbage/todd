@@ -146,8 +146,7 @@ func isInGroup(matchStatements []map[string]string, factmap map[string][]string)
 			// process, so this is an acceptable temporary workaround.
 			hostname := factmap["Hostname"][0]
 
-			result := exp.Find([]byte(hostname))
-			if result != nil {
+			if exp.Match([]byte(hostname)) {
 				return true
 			}
 
