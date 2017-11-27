@@ -1,6 +1,6 @@
 ---
 type: testrun
-label: inttest-iperf
+label: test-iperf
 spec:
     targettype: group
     source:

@@ -1,13 +1,12 @@
 ---
-# Example test file
 type: testrun
-label: test-ping-dns-dc
+label: test-ping
 spec:
     targettype: uncontrolled
     source:
-        name: datacenter
+        name: red
         app: ping
-        args: "-c 10"
+        args: "-c 3"
     target:
     - 4.2.2.2
     - 8.8.8.8

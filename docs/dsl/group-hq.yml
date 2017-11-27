@@ -1,7 +1,0 @@
----
-type: group
-label: headquarters
-spec:
-    group: headquarters
-    matches:
-    - within_subnet: "10.128.0.0/16"
