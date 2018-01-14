@@ -14,4 +14,7 @@ set -o pipefail
 : ${GOPATH:?"Please ensure GOPATH is set, and run sudo with -E when performing 'make install'"}
 
 # Enable raw socket capabilities on toddping
-setcap cap_net_raw+ep $GOPATH/bin/toddping
+#
+# NOTE - disabled for now, as `setcap` command not present in alpine-based golang docker image
+# May want to explore this further, but for now, the image works without this
+# setcap cap_net_raw+ep $GOPATH/bin/toddping
