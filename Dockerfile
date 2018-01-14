@@ -1,4 +1,4 @@
-FROM golang:1.5
+FROM golang:1.9
 MAINTAINER Matt Oswalt <matt@keepingitclassless.net> (@mierdin)
 
 LABEL version="0.1"
