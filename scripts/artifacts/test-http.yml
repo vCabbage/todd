@@ -1,11 +1,10 @@
 ---
-# Example test file
 type: testrun
 label: test-http
 spec:
     targettype: uncontrolled
     source:
-        name: rpi
+        name: red
         app: http
         args: ""
     target:
